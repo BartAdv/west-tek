@@ -1,0 +1,12 @@
+{application, westtek,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { westtek_app, []}},
+  {env, []}
+ ]}.
