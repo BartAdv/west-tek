@@ -11,11 +11,11 @@
                    event_mgr}).
 
 %% API
-add_entity(Pid, Cr) ->
-    gen_server:call(Pid, {add_entity, Cr}).
+add_entity(Pid, Ent) ->
+    gen_server:call(Pid, {add_entity, Ent}).
 
-remove_entity(Pid, Cr) ->
-    gen_server:call(Pid, {remove_entity, Cr}).
+remove_entity(Pid, Ent) ->
+    gen_server:call(Pid, {remove_entity, Ent}).
 
 add_handler(Pid, Handler, Args) ->
     gen_server:call(Pid, {add_handler, Handler, Args}).
@@ -28,14 +28,31 @@ notify(Pid, Event) ->
 
 %% internals
 
+iter_entities(Es, F) ->
+    Fr = fun Fr(Iter) ->
+                 case gb_trees:next(Iter) of
+                     {Ent, _, Iter2} -> F(Ent), Fr(Iter2);
+                     none -> nil
+                 end
+         end,
+    Fr(gb_trees:iterator(Es)).
+
+notify_all_entities(Es, Event) ->
+    iter_entities(Es, fun(Ent) -> gen_event:notify(Ent, Event) end).
+
 map_add_entity(#map_data{entities=Es}=Map, Ent) ->
     Ref = monitor(process, Ent),
-    Map#map_data{entities=gb_trees:insert(Ent, Ref, Es)}.
+    Es2 = gb_trees:insert(Ent, Ref, Es),
+    %% notify all entities on map
+    notify_all_entities(Es2, {entity_entered_map, Ent, self()}),
+    Map#map_data{entities=Es2}.
 
 map_remove_entity(#map_data{entities=Es}=Map, Ent) ->
     Ref = gb_trees:get(Ent, Es),
     demonitor(Ref),
-    Map#map_data{entities = gb_trees:delete(Ent, Es)}.
+    Es2 = gb_trees:delete(Ent, Es),
+    notify_all_entities(Es2, {entity_left_map, Ent, self()}),
+    Map#map_data{entities = Es2}.
 
 %% Server
 
