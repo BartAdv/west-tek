@@ -4,6 +4,7 @@
 -export([add_entity/2, remove_entity/2]).
 -export([init/1, terminate/2, start_link/0, handle_call/3, handle_info/2]).
 -export([add_handler/3, call/3, notify/2]).
+-export([get_info/1]).
 
 -define(TEST, 1).
 -ifdef(TEST).
@@ -28,6 +29,9 @@ call(Pid, Handler, Request) ->
 
 notify(Pid, Event) ->
     gen_server:call(Pid, {notify, Event}).
+
+get_info(Pid) ->
+    gen_server:call(Pid, get_info).
 
 %% internals
 
@@ -92,7 +96,10 @@ handle_call({call, Handler, Request}, _From, #map_data{event_mgr=EventMgr}=Map) 
 
 handle_call({add_handler, Handler, Args}, _From, #map_data{event_mgr=EventMgr}=Map) ->
     Res = gen_event:add_handler(EventMgr, Handler, Args),
-    {reply, Res, Map}.
+    {reply, Res, Map};
+
+handle_call(get_info, _From, #map_data{entities=Es}=Map) ->
+    {reply, #{entities_count => gb_trees:size(Es)}, Map}.
 
 
 %% when Entity process dies, we need to remove our references to it
