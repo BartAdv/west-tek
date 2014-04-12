@@ -11,7 +11,8 @@
 -record(vis_data, {vis_list=gb_trees:empty() %% Entity => Coord
                   ,grid=gb_trees:empty() %% Coord => Hex (rather terrible structure considering path tracing may come up)
                   ,pos
-                  ,range=10}).
+                  ,range
+                  ,event_mgr}).
 
 get_hex(Grid, Coords) ->
     case gb_trees:lookup(Coords, Grid) of
@@ -43,46 +44,56 @@ dist({X1, Y1}, {X2, Y2}) ->
 
 %% gen_event
 
-init({Coords, Range}) ->
-    {ok, #vis_data{pos=Coords, range=Range}}.
+init({EventMgr, Coords, Range}) ->
+    {ok, #vis_data{event_mgr=EventMgr, pos=Coords, range=Range}}.
 
 handle_event({entity_entered_map, Ent, Coords, _Map},
-             #vis_data{vis_list=VisList, grid=Grid, pos=Pos, range=Range}=Vis) ->
+             #vis_data{event_mgr=EventMgr, vis_list=VisList, grid=Grid, pos=Pos, range=Range}=Vis) ->
     case dist(Pos, Coords) =< Range of
         true ->
             Vis2 = add_entity(Vis, Coords, Ent),
+            gen_event:notify(EventMgr, {entity_spotted, Ent}),
             {ok, Vis2};
         false ->
             {ok, Vis}
     end;
 
 handle_event({entity_left_map, Ent, _Map},
-             #vis_data{vis_list=VisList, grid=Grid}=Vis) ->
+             #vis_data{event_mgr=EventMgr, vis_list=VisList, grid=Grid}=Vis) ->
     case gb_trees:lookup(Ent, VisList) of
         {value, Coords} ->
             Vis2 = remove_entity(Vis, Coords, Ent),
+            gen_event:notify(EventMgr, {entity_out_of_sight, Ent}),
             {ok, Vis2};
         none -> {ok, Vis}
     end;
 
 handle_event({entity_moved_on_map, Ent, From, To, _Map},
-             #vis_data{vis_list=VisList, grid=Grid, pos=Pos, range=Range}=Vis) ->
+             #vis_data{event_mgr=EventMgr, vis_list=VisList, grid=Grid, pos=Pos, range=Range}=Vis) ->
     case gb_trees:lookup(Ent, VisList) of
         {value, Coords} ->
             case dist(Pos, To) =< Range of
                 true ->
                     {ok, move_entity(Vis, From, To, Ent)};
                 false ->
-                    {ok, remove_entity(Vis, From, Ent)}
+                    Vis2 = remove_entity(Vis, From, Ent),
+                    gen_event:notify(EventMgr, {entity_out_of_sight, Ent}),
+                    {ok, Vis2}
             end;
         none ->
             case dist(Pos, To) =< Range of
                 true ->
-                    {ok, add_entity(Vis, To, Ent)};
+                    Vis2 = add_entity(Vis, To, Ent),
+                    gen_event:notify(EventMgr, {entity_spotted, Ent}),
+                    {ok, Vis2};
                 false ->
                     {ok, Vis}
             end
-    end.
+    end;
+
+handle_event(_, Vis) ->
+    {ok, Vis}.
+
 
 handle_call({set_range, Range}, Vis) ->
     {ok, ok, Vis#vis_data{range=Range}};
@@ -98,7 +109,7 @@ test_entity() ->
 
 test_init(Coords, Range) ->
     {ok, Pid} = gen_event:start(),
-    gen_event:add_handler(Pid, ?MODULE, {Coords, Range}),
+    gen_event:add_handler(Pid, ?MODULE, {Pid, Coords, Range}),
     {Pid, test_entity()}.
 
 get(Pid, Coords) ->
