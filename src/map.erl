@@ -5,7 +5,10 @@
 -export([init/1, terminate/2, start_link/0, handle_call/3, handle_info/2]).
 -export([add_handler/3, call/3, notify/2]).
 
--export([test/0]).
+-define(TEST, 1).
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
 
 -record(map_data, {entities=gb_trees:empty(),
                    event_mgr}).
@@ -41,11 +44,15 @@ notify_all_entities(Es, Event) ->
     iter_entities(Es, fun(Ent) -> gen_event:notify(Ent, Event) end).
 
 map_add_entity(#map_data{entities=Es}=Map, Ent) ->
-    Ref = monitor(process, Ent),
-    Es2 = gb_trees:insert(Ent, Ref, Es),
-    %% notify all entities on map
-    notify_all_entities(Es2, {entity_entered_map, Ent, self()}),
-    Map#map_data{entities=Es2}.
+    case gb_trees:is_defined(Ent, Es) of
+        false ->
+            Ref = monitor(process, Ent),
+            Es2 = gb_trees:insert(Ent, Ref, Es),
+            %% notify all entities on map
+            notify_all_entities(Es2, {entity_entered_map, Ent, self()}),
+            Map#map_data{entities=Es2};
+        true -> already_added
+end.
 
 map_remove_entity(#map_data{entities=Es}=Map, Ent) ->
     Ref = gb_trees:get(Ent, Es),
@@ -67,7 +74,10 @@ terminate(_Reason, _) ->
     ok.
 
 handle_call({add_entity, Ent}, _From, Map) ->
-    {reply, ok, map_add_entity(Map, Ent)};
+    case map_add_entity(Map, Ent) of
+        already_added -> {reply, already_added, Map};
+        NewMap -> {reply, ok, NewMap}
+    end;
 
 handle_call({remove_entity, Ent}, _From, Map) ->
     {reply, ok, map_remove_entity(Map, Ent)};
@@ -92,10 +102,22 @@ handle_info({'DOWN', Ref, process, Pid, _Reason}, #map_data{entities=Es}=Map) ->
             {noreply, map_remove_entity(Map, Pid)}
         end.
 
-test() ->
-    Cr = spawn(fun() -> receive kill -> exit(ok) end end),
+-ifdef(TEST).
+
+test_entity() ->
+   spawn(fun()-> receive kill -> exit(killed) end end).
+
+add_remove_test() ->
+    Cr = test_entity(),
     {ok, Pid} = map:start_link(),
     map:add_entity(Pid, Cr),
     map:remove_entity(Pid, Cr),
+    ok=map:add_entity(Pid, Cr).
+
+cannot_add_already_added_test() ->
+    Cr = test_entity(),
+    {ok, Pid} = map:start_link(),
     map:add_entity(Pid, Cr),
-    Cr ! kill.
+    already_added = map:add_entity(Pid, Cr).
+
+-endif.
