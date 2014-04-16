@@ -60,6 +60,13 @@ load_tiles(File, Tab) ->
         end,
     R(File).
 
+map_object_type(0) ->
+    critter;
+map_object_type(1) ->
+    item;
+map_object_type(2) ->
+    scenery.
+
 load_objects(File, Tab) ->
     {ok, Re} = re:compile("MapObjType[\\s\\t]+([0-9]+)"),
     R = fun R(File) ->
@@ -68,8 +75,8 @@ load_objects(File, Tab) ->
                         case re:run(Line, Re) of
                             {match, [_, T]} ->
                                 Type = get_integer(Line, T),
-                                Obj = load_properties(File, #{}),
-                                #{'MapX' := MapX, 'MapY' := MapY} = Obj,
+                                Obj = load_properties(File, #{type=>map_object_type(get_integer(Line, T))}),
+                                #{x:=MapX, x:=MapY} = Obj,
                                 ets:insert(Tab, {{MapX, MapY}, Obj}), %% transform type to atom and store it as part of the key
                                 R(File);
                             nomatch -> Tab
