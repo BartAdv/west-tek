@@ -42,6 +42,9 @@ move_entity(#vis_data{grid=Grid}=Vis, From, To, Ent) ->
 dist({X1, Y1}, {X2, Y2}) ->
     math:sqrt((X1-X2)*(X1-X2) + ((Y1-Y2)*(Y1-Y2))).
 
+to_local({X1, Y1}, {X2, Y2}) ->
+    {X2-X1, Y2-Y1}.
+
 %% gen_event
 
 init({EventMgr, Coords, Range}) ->
@@ -51,7 +54,7 @@ handle_event({entity_entered_map, Ent, Coords, _Map},
              #vis_data{event_mgr=EventMgr, vis_list=VisList, grid=Grid, pos=Pos, range=Range}=Vis) ->
     case dist(Pos, Coords) =< Range of
         true ->
-            Vis2 = add_entity(Vis, Coords, Ent),
+            Vis2 = add_entity(Vis, to_local(Pos, Coords), Ent),
             gen_event:notify(EventMgr, {entity_spotted, Ent}),
             {ok, Vis2};
         false ->
@@ -70,20 +73,22 @@ handle_event({entity_left_map, Ent, _Map},
 
 handle_event({entity_moved_on_map, Ent, From, To, _Map},
              #vis_data{event_mgr=EventMgr, vis_list=VisList, grid=Grid, pos=Pos, range=Range}=Vis) ->
+    LocalFrom = to_local(Pos, From),
+    LocalTo = to_local(Pos, To),
     case gb_trees:lookup(Ent, VisList) of
         {value, Coords} ->
             case dist(Pos, To) =< Range of
                 true ->
-                    {ok, move_entity(Vis, From, To, Ent)};
+                    {ok, move_entity(Vis, LocalFrom, LocalTo, Ent)};
                 false ->
-                    Vis2 = remove_entity(Vis, From, Ent),
+                    Vis2 = remove_entity(Vis, LocalFrom, Ent),
                     gen_event:notify(EventMgr, {entity_out_of_sight, Ent}),
                     {ok, Vis2}
             end;
         none ->
             case dist(Pos, To) =< Range of
                 true ->
-                    Vis2 = add_entity(Vis, To, Ent),
+                    Vis2 = add_entity(Vis, LocalTo, Ent),
                     gen_event:notify(EventMgr, {entity_spotted, Ent}),
                     {ok, Vis2};
                 false ->
@@ -118,38 +123,38 @@ get(Pid, Coords) ->
 in_range_test() ->
     {Pid, E} = test_init({1,1}, 10),
     gen_event:sync_notify(Pid, {entity_entered_map, E, {2, 2}, nil}),
-    [E|_] = get(Pid, {2, 2}).
+    [E|_] = get(Pid, {1, 1}).
 
 out_of_range_test() ->
     {Pid, E} = test_init({1,1}, 1),
     gen_event:sync_notify(Pid, {entity_entered_map, E, {5, 5}, nil}),
-    [] = get(Pid, {5, 5}).
+    [] = get(Pid, {4, 4}).
 
 leaving_range_test() ->
     {Pid, E} = test_init({1,1}, 10),
     gen_event:sync_notify(Pid, {entity_entered_map, E, {2,2}, nil}),
     gen_event:sync_notify(Pid, {entity_left_map, E, nil}),
-    [] = get(Pid, {2, 2}).
+    [] = get(Pid, {1, 1}).
 
 moving_in_range_test() ->
     {Pid, E} = test_init({1,1}, 10),
     gen_event:sync_notify(Pid, {entity_entered_map, E, {2, 2}, nil}),
     gen_event:sync_notify(Pid, {entity_moved_on_map, E, {2, 2}, {3, 3}, nil}),
-    [] = get(Pid, {2, 2}),
-    [E|_] = get(Pid, {3, 3}).
+    [] = get(Pid, {1, 1}),
+    [E|_] = get(Pid, {2, 2}).
 
 moving_into_the_range_test() ->
     {Pid, E} = test_init({1, 1}, 2),
     gen_event:sync_notify(Pid, {entity_entered_map, E, {5, 5}, nil}),
     gen_event:sync_notify(Pid, {entity_moved_on_map, E, {5, 5}, {2, 2}, nil}),
-    [] = get(Pid, {5, 5}),
-    [E|_] = get(Pid, {2, 2}).
+    [] = get(Pid, {4, 4}),
+    [E|_] = get(Pid, {1, 1}).
 
 moving_out_of_the_range_test() ->
     {Pid, E} = test_init({1, 1}, 2),
     gen_event:sync_notify(Pid, {entity_entered_map, E, {2, 2}, nil}),
     gen_event:sync_notify(Pid, {entity_moved_on_map, E, {2, 2}, {3, 3}, nil}),
-    [] = get(Pid, {2, 2}),
-    [] = get(Pid, {3, 3}).
+    [] = get(Pid, {1, 1}),
+    [] = get(Pid, {1, 1}).
 
 -endif.
