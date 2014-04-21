@@ -45,7 +45,7 @@ iter_entities(Es, F) ->
     Fr(gb_trees:iterator(Es)).
 
 notify_all_entities(Es, Event) ->
-    iter_entities(Es, fun(Ent) -> gen_event:notify(Ent, Event) end).
+    iter_entities(Es, fun(Ent) -> entity:notify(Ent, Event) end).
 
 map_add_entity(#map_data{entities=Es}=Map, Ent) ->
     case gb_trees:is_defined(Ent, Es) of
