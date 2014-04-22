@@ -1,7 +1,7 @@
 -module(map).
 -behaviour(gen_server).
 
--export([add_entity/2, remove_entity/2]).
+-export([add_entity/3, remove_entity/2]).
 -export([init/1, terminate/2, start_link/0, handle_call/3, handle_info/2]).
 -export([add_handler/3, call/3, notify/2]).
 -export([get_info/1]).
@@ -15,8 +15,8 @@
                    event_mgr}).
 
 %% API
-add_entity(Pid, Ent) ->
-    gen_server:call(Pid, {add_entity, Ent}).
+add_entity(Pid, Ent, Coords) ->
+    gen_server:call(Pid, {add_entity, Ent, Coords}).
 
 remove_entity(Pid, Ent) ->
     gen_server:call(Pid, {remove_entity, Ent}).
@@ -47,13 +47,13 @@ iter_entities(Es, F) ->
 notify_all_entities(Es, Event) ->
     iter_entities(Es, fun(Ent) -> entity:notify(Ent, Event) end).
 
-map_add_entity(#map_data{entities=Es}=Map, Ent) ->
+map_add_entity(#map_data{entities=Es}=Map, Ent, Coords) ->
     case gb_trees:is_defined(Ent, Es) of
         false ->
             Ref = monitor(process, Ent),
             Es2 = gb_trees:insert(Ent, Ref, Es),
             %% notify all entities on map
-            notify_all_entities(Es2, {entity_entered_map, Ent, self()}),
+            notify_all_entities(Es2, {entity_entered_map, Ent, Coords, self()}),
             Map#map_data{entities=Es2};
         true -> already_added
 end.
@@ -77,8 +77,8 @@ init(_Args) ->
 terminate(_Reason, _) ->
     ok.
 
-handle_call({add_entity, Ent}, _From, Map) ->
-    case map_add_entity(Map, Ent) of
+handle_call({add_entity, Ent, Coords}, _From, Map) ->
+    case map_add_entity(Map, Ent, Coords) of
         already_added -> {reply, already_added, Map};
         NewMap -> {reply, ok, NewMap}
     end;
@@ -117,14 +117,14 @@ test_entity() ->
 add_remove_test() ->
     Cr = test_entity(),
     {ok, Pid} = map:start_link(),
-    map:add_entity(Pid, Cr),
+    map:add_entity(Pid, Cr, {1,1}),
     map:remove_entity(Pid, Cr),
-    ok=map:add_entity(Pid, Cr).
+    ok=map:add_entity(Pid, Cr, {1,1}).
 
 cannot_add_already_added_test() ->
     Cr = test_entity(),
     {ok, Pid} = map:start_link(),
-    map:add_entity(Pid, Cr),
-    already_added = map:add_entity(Pid, Cr).
+    map:add_entity(Pid, Cr, {1,1}),
+    already_added = map:add_entity(Pid, Cr, {1,1}).
 
 -endif.
