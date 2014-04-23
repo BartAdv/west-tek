@@ -39,6 +39,9 @@ move_entity(#vis_data{grid=Grid}=Vis, From, To, Ent) ->
     Grid3   = gb_trees:enter(To, HexTo, Grid2), %% don't judge me
     Vis#vis_data{grid=Grid3}.
 
+clear(Vis) ->
+    Vis#vis_data{grid=gb_trees:empty(), vis_list=gb_trees:empty()}.
+
 dist({X1, Y1}, {X2, Y2}) ->
     math:sqrt((X1-X2)*(X1-X2) + ((Y1-Y2)*(Y1-Y2))).
 
@@ -67,6 +70,12 @@ handle_event({entity_entered_map, Ent, Coords, _Map},
             {ok, Vis}
     end;
 
+%% self leaves map - just clear vis data
+handle_event({entity_left_map, Self, _Map},
+	    #vis_data{entity=Self}=Vis) ->
+    {ok, clear(Vis)};
+
+%% some other entity leaves map
 handle_event({entity_left_map, Ent, _Map},
              #vis_data{entity=Self, vis_list=VisList, grid=Grid}=Vis) ->
     case gb_trees:lookup(Ent, VisList) of
@@ -77,6 +86,14 @@ handle_event({entity_left_map, Ent, _Map},
         none -> {ok, Vis}
     end;
 
+%% self moves on map - recreate
+handle_event({entity_moved_on_map, Self, From, To, Map},
+	     #vis_data{entity=Self, pos=Pos}=Vis) ->
+    Vis2 = clear(Vis),
+    map:notify(Map, {where_are_you, Self}),
+    {ok, Vis2#vis_data{pos=To}};
+
+%% some other entity moves on map
 handle_event({entity_moved_on_map, Ent, From, To, _Map},
              #vis_data{entity=Self, vis_list=VisList, grid=Grid, pos=Pos, range=Range}=Vis) ->
     LocalFrom = to_local(Pos, From),
@@ -141,6 +158,7 @@ test_init(Coords, Range) ->
     entity:add_handler(Self, test_handler, []),
     entity:add_handler(Self, ?MODULE, {Self, Coords, Range}),
     {ok, Other} = entity:start_link(),
+    entity:add_handler(Other, test_handler, []),
     {Self, Other}.
 
 get_vis_list(Pid) ->
@@ -186,6 +204,16 @@ moving_out_of_the_range_test() ->
     [] = get(Pid, {1, 1}),
     [] = get(Pid, {1, 1}).
 
+self_moving_test() ->
+    {Pid, E} = test_init({1, 1}, 5),
+    {ok, Map} = map:start_link(),
+    map:add_handler(Map, test_handler, []),
+    entity:sync_notify(Pid, {entity_entered_map, E, {3, 3}, Map}),
+    entity:sync_notify(Pid, {entity_moved_on_map, Pid, {1,1}, {2,2}, Map}),
+    [] = get(Pid, {2,2}),
+    Evs = map:call(Map, test_handler, dump),
+    Evs = [{where_are_you, Pid}].
+
 entering_map_sends_position_request_test() ->
     {Pid, _} = test_init({1,1}, 2),
     {ok, Map} = map:start_link(),
@@ -198,7 +226,6 @@ entering_map_sends_position_request_test() ->
 
 position_request_test() ->
     {Pid, E} = test_init({2,3}, 5),
-    entity:add_handler(E, test_handler, []),
     entity:sync_notify(Pid, {where_are_you, E}),
     Evs = entity:call(E, test_handler, dump),
     Evs = [{i_am_here, Pid, {2,3}}].
