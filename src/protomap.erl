@@ -76,8 +76,8 @@ load_objects(File, Tab) ->
                             {match, [_, T]} ->
                                 Type = get_integer(Line, T),
                                 Obj = load_properties(File, #{type=>map_object_type(get_integer(Line, T))}),
-                                #{x:=MapX, x:=MapY} = Obj,
-                                ets:insert(Tab, {{MapX, MapY}, Obj}), %% transform type to atom and store it as part of the key
+                                #{'MapX':=X, 'MapY':=Y} = Obj,
+                                ets:insert(Tab, {{X, Y}, Obj}), %% transform type to atom and store it as part of the key
                                 R(File);
                             nomatch -> Tab
                         end;
