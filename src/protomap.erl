@@ -1,10 +1,21 @@
 -module(protomap).
 -behaviour(gen_server).
 
--export([init/1]).
+-export([get/2]).
+-export([init/1, start/1, handle_call/3]).
 
 -record(proto_map, {header
                    ,hexes}).
+
+%% API
+
+get(Pid, Coords) ->
+    gen_server:call(Pid, {get, Coords}).
+
+start(FileName) ->
+    gen_server:start(?MODULE, FileName, []).
+
+%% internals
 
 get_str(Str, {S,L}) -> string:substr(Str, S+1, L).
 
@@ -21,8 +32,7 @@ load_properties(File, Props) ->
         {ok, Line} ->
             %% need to put it outside to avoid needless reevaluation
             Matchers = [{"([A-Za-z0-9]+)[\\s\\t]+(-*[0-9]+)"
-                        ,fun([_, P, V]) -> {get_atom(Line, P), get_integer(Line, V)}
-                         end}
+                        ,fun([_, P, V]) -> {get_atom(Line, P), get_integer(Line, V)} end}
                        ,{"([A-Za-z0-9]+)[\\s\\t]+\"([^\"]+)\""
                         ,fun([_, P, V]) -> {get_atom(Line, P), get_str(Line, V)} end}],
             case Line of
@@ -109,3 +119,7 @@ init(FileName) ->
     {ok, File} = file:open(FileName, read),
     Hexes = ets:new(hexes, [bag]),
     {ok, load_protomap(File, #proto_map{hexes=Hexes})}.
+
+handle_call({get, {X,Y}=Coords}, _From, #proto_map{hexes=Hx}=ProtoMap) ->
+    Objs = ets:lookup(Hx, Coords),
+    {reply, Objs, ProtoMap}.
