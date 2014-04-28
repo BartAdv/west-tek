@@ -1,8 +1,8 @@
--module(map).
+emodule(map).
 -behaviour(gen_server).
 
--export([add_entity/3, remove_entity/2]).
--export([init/1, terminate/2, start_link/0, handle_call/3, handle_info/2]).
+-export([add_entity/3, remove_entity/2, register/2]).
+-export([init/1, terminate/2, start/0, start_link/0, handle_call/3, handle_info/2]).
 -export([add_handler/3, call/3, notify/2]).
 -export([get_info/1]).
 
@@ -20,6 +20,9 @@ add_entity(Pid, Ent, Coords) ->
 
 remove_entity(Pid, Ent) ->
     gen_server:call(Pid, {remove_entity, Ent}).
+
+register(Pid, Id) ->
+    gen_server:call(Pid, {register, Id}).
 
 add_handler(Pid, Handler, Args) ->
     gen_server:call(Pid, {add_handler, Handler, Args}).
@@ -67,6 +70,9 @@ map_remove_entity(#map_data{entities=Es}=Map, Ent) ->
 
 %% Server
 
+start() ->
+    gen_server:start(?MODULE, [], []).
+
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
@@ -98,6 +104,10 @@ handle_call({add_handler, Handler, Args}, _From, #map_data{event_mgr=EventMgr}=M
     Res = gen_event:add_handler(EventMgr, Handler, Args),
     {reply, Res, Map};
 
+handle_call({register, Id}, _From, Map) ->
+    Pid = map_mgr:register(Id),
+    {reply, Pid, Map};
+    
 handle_call(get_info, _From, #map_data{entities=Es}=Map) ->
     {reply, #{entities_count => gb_trees:size(Es)}, Map}.
 
