@@ -1,4 +1,4 @@
-emodule(map).
+-module(map).
 -behaviour(gen_server).
 
 -export([add_entity/3, remove_entity/2, register/2]).
