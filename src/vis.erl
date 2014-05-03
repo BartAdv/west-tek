@@ -219,7 +219,6 @@ entering_map_sends_position_request_test() ->
     {ok, Map} = map:start_link(),
     map:add_handler(Map, test_handler, []),
     Es = [E || {ok, E} <- [entity:start_link() || _ <- [1,2,3]]],
-    lists:foreach(fun(E) -> map:add_entity(Map, E, {2,2}) end, Es),
     entity:sync_notify(Pid, {entity_entered_map, Pid, {1,1}, Map}),
     Evs = entity:call(Map, test_handler, dump),
     Evs = [{where_are_you, Pid}].

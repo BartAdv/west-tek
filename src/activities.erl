@@ -12,12 +12,14 @@
 enter_map(EntityId, MapId, Coords) ->
     Entity = entity_mgr:get(EntityId),
     Map = map_mgr:get(MapId),
-    map:add_entity(Map, Entity, Coords).
+    map:add_entity(Map, Entity),
+    map:notify_entities(Map, {entity_entered_map, Entity, Coords, Map}).
 
 exit_map(EntityId, MapId) ->
     Entity = entity_mgr:get(EntityId),
     Map = map_mgr:get(MapId),
-    map:remove_entity(Map, Entity).
+    map:remove_entity(Map, Entity),
+    map:notify_entities(Map, {entity_left_map, Entity, Map}).
 
 -ifdef(TEST).
 
