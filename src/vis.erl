@@ -207,21 +207,24 @@ moving_out_of_the_range_test() ->
 self_moving_test() ->
     {Pid, E} = test_init({1, 1}, 5),
     {ok, Map} = map:start_link(),
-    map:add_handler(Map, test_handler, []),
+    map:add_entity(Map, E),
     entity:sync_notify(Pid, {entity_entered_map, E, {3, 3}, Map}),
     entity:sync_notify(Pid, {entity_moved_on_map, Pid, {1,1}, {2,2}, Map}),
     [] = get(Pid, {2,2}),
-    Evs = map:call(Map, test_handler, dump),
+    Evs = entity:call(E, test_handler, dump),
     Evs = [{where_are_you, Pid}].
 
 entering_map_sends_position_request_test() ->
     {Pid, _} = test_init({1,1}, 2),
     {ok, Map} = map:start_link(),
-    map:add_handler(Map, test_handler, []),
     Es = [E || {ok, E} <- [entity:start_link() || _ <- [1,2,3]]],
+    lists:foreach(fun(E) -> 
+			  map:add_entity(Map, E),
+			  entity:add_handler(E, test_handler, [])
+		  end, Es),
     entity:sync_notify(Pid, {entity_entered_map, Pid, {1,1}, Map}),
-    Evs = entity:call(Map, test_handler, dump),
-    Evs = [{where_are_you, Pid}].
+    Evs = lists:flatmap(fun(E) -> entity:call(E, test_handler, dump) end, Es),
+    Evs = [{where_are_you, P} || P <- [Pid, Pid, Pid]].
 
 position_request_test() ->
     {Pid, E} = test_init({2,3}, 5),

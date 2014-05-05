@@ -3,7 +3,7 @@
 
 -export([add_entity/2, remove_entity/2, register/2]).
 -export([init/1, terminate/2, start/0, start_link/0, handle_call/3, handle_info/2]).
--export([add_handler/3, call/3, notify/2, notify_entities/2]).
+-export([notify/2]).
 -export([get_info/1]).
 
 -define(TEST, 1).
@@ -11,8 +11,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
--record(map_data, {entities=gb_trees:empty(),
-                   event_mgr}).
+-record(map_data, {entities=gb_trees:empty()}).
 
 %% API
 add_entity(Pid, Ent) ->
@@ -32,9 +31,6 @@ call(Pid, Handler, Request) ->
 
 notify(Pid, Event) ->
     gen_server:call(Pid, {notify, Event}).
-
-notify_entities(Pid, Event) ->
-    gen_server:call(Pid, {notify_entities, Event}).
 
 get_info(Pid) ->
     gen_server:call(Pid, get_info).
@@ -74,8 +70,7 @@ start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
 init(_Args) ->
-    {ok, EventMgr} = gen_event:start_link(),
-    {ok, #map_data{event_mgr=EventMgr}}.
+    {ok, #map_data{}}.
 
 terminate(_Reason, _) ->
     ok.
@@ -89,21 +84,9 @@ handle_call({add_entity, Ent}, _From, Map) ->
 handle_call({remove_entity, Ent}, _From, Map) ->
     {reply, ok, map_remove_entity(Map, Ent)};
 
-handle_call({notify, Event}, _From, #map_data{event_mgr=EventMgr}=Map) ->
-    gen_event:notify(EventMgr, Event),
-    {reply, ok, Map};
-
-handle_call({notify_entities, Event}, _From, #map_data{entities=Es}=Map) ->
+handle_call({notify, Event}, _From, #map_data{entities=Es}=Map) ->
     iter_entities(Es, fun(Ent) -> entity:notify(Ent, Event) end),
     {reply, ok, Map};
-
-handle_call({call, Handler, Request}, _From, #map_data{event_mgr=EventMgr}=Map) ->
-    Res = gen_event:call(EventMgr, Handler, Request),
-    {reply, Res, Map};
-
-handle_call({add_handler, Handler, Args}, _From, #map_data{event_mgr=EventMgr}=Map) ->
-    Res = gen_event:add_handler(EventMgr, Handler, Args),
-    {reply, Res, Map};
 
 handle_call({register, Id}, _From, Map) ->
     Pid = map_mgr:register(Id),
