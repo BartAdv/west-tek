@@ -1,7 +1,7 @@
 -module(protomap).
 -behaviour(gen_server).
 
--export([get/2]).
+-export([get/4, get_entities/1]).
 -export([init/1, start/1, handle_call/3]).
 
 -record(proto_map, {header
@@ -9,8 +9,11 @@
 
 %% API
 
-get(Pid, Coords) ->
-    gen_server:call(Pid, {get, Coords}).
+get(Pid, X, Y, Type) ->
+    gen_server:call(Pid, {get, X, Y, Type}).
+
+get_entities(Pid) ->
+    gen_server:call(Pid, get_entities).
 
 start(FileName) ->
     gen_server:start(?MODULE, FileName, []).
@@ -56,45 +59,45 @@ load_properties(File, Props) ->
 
 load_tiles(File, Tab) ->
     {ok, Re} = re:compile("(tile|roof)[\\s\\t]+([0-9]+)[\\s\\t]+([0-9]+)[\\s\\t]+(.+)$"),
-    R = fun R(File) ->
+    R = fun R() ->
                 {ok, Line} = file:read_line(File),
                 case re:run(Line, Re) of
-                    {match, [_, T, X, Y, S]} ->
+                    {match, [_, T, Mx, My, S]} ->
                         Type = get_atom(Line, T),
-                        Coords = {get_integer(Line, X), get_integer(Line, Y)},
+                        {X, Y} = {get_integer(Line, Mx), get_integer(Line, My)},
                         Frm = get_str(Line, S),
-                        ets:insert(Tab, {Coords, {Type, Frm}}),
-                        R(File);
+                        ets:insert(Tab, {{X, Y, Type}, Frm}),
+                        R();
                     nomatch -> Tab
                 end
         end,
-    R(File).
+    R().
 
 map_object_type(0) ->
-    critter;
+    entity;
 map_object_type(1) ->
-    item;
+    entity;
 map_object_type(2) ->
     scenery.
 
 load_objects(File, Tab) ->
     {ok, Re} = re:compile("MapObjType[\\s\\t]+([0-9]+)"),
-    R = fun R(File) ->
+    R = fun R() ->
                 case file:read_line(File) of
                     {ok, Line} ->
                         case re:run(Line, Re) of
                             {match, [_, T]} ->
-                                Type = get_integer(Line, T),
-                                Obj = load_properties(File, #{type=>map_object_type(get_integer(Line, T))}),
+                                Type = map_object_type(get_integer(Line, T)),
+                                Obj = load_properties(File, #{}),
                                 #{'MapX':=X, 'MapY':=Y} = Obj,
-                                ets:insert(Tab, {{X, Y}, Obj}), %% transform type to atom and store it as part of the key
-                                R(File);
+                                ets:insert(Tab, {{X, Y, Type}, Obj}), 
+                                R();
                             nomatch -> Tab
                         end;
                     eof -> Tab
                 end
         end,
-    R(File).
+    R().
 
 load_protomap(File, #proto_map{hexes=Hexes}=ProtoMap) ->
     case file:read_line(File) of
@@ -102,10 +105,10 @@ load_protomap(File, #proto_map{hexes=Hexes}=ProtoMap) ->
             Header = load_properties(File, #{}),
             load_protomap(File, ProtoMap#proto_map{header=Header});
         {ok, "[Tiles]\n"} ->
-            Tiles = load_tiles(File, Hexes),
+            Hexes = load_tiles(File, Hexes),
             load_protomap(File, ProtoMap);
         {ok, "[Objects]\n"} ->
-            Objects = load_objects(File, Hexes),
+            Hexes = load_objects(File, Hexes),
             load_protomap(File, ProtoMap);
         eof ->
             ProtoMap;
@@ -117,9 +120,15 @@ load_protomap(File, #proto_map{hexes=Hexes}=ProtoMap) ->
 
 init(FileName) ->
     {ok, File} = file:open(FileName, read),
-    Hexes = ets:new(hexes, [bag]),
+    Hexes = ets:new(hexes, [duplicate_bag]),
     {ok, load_protomap(File, #proto_map{hexes=Hexes})}.
 
-handle_call({get, {X,Y}=Coords}, _From, #proto_map{hexes=Hx}=ProtoMap) ->
-    Objs = ets:lookup(Hx, Coords),
-    {reply, Objs, ProtoMap}.
+handle_call({get, X, Y, Type}, _From, #proto_map{hexes=Hx}=ProtoMap) ->
+    Res = ets:lookup(Hx, {X, Y, Type}),
+    Out = lists:map(fun({{_, _, Type}, Obj}) -> Obj end, Res),
+    {reply, Out, ProtoMap};
+
+handle_call(get_entities, _From, #proto_map{hexes=Hx}=ProtoMap) ->
+    Res = ets:match(Hx, {{'$1','$2',entity}, '$3'}),
+    Out = lists:map(fun([X, Y, Obj]) -> {{X, Y}, Obj} end, Res),
+    {reply, Out, ProtoMap}.
