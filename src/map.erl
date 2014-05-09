@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 -export([add_entity/2, remove_entity/2, register/2]).
--export([init/1, terminate/2, start/0, start_link/0, handle_call/3, handle_info/2]).
+-export([init/1, terminate/2, start/1, start_link/1, handle_call/3, handle_info/2]).
 -export([notify/2]).
 -export([get_info/1]).
 
@@ -11,7 +11,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
--record(map_data, {entities=gb_trees:empty()}).
+-record(map_data, {proto
+		  ,entities = gb_trees:empty()}).
 
 %% API
 add_entity(Pid, Ent) ->
@@ -63,14 +64,15 @@ map_remove_entity(#map_data{entities=Es}=Map, Ent) ->
 
 %% Server
 
-start() ->
-    gen_server:start(?MODULE, [], []).
+start(ProtoMap) ->
+    gen_server:start(?MODULE, ProtoMap, []).
 
-start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+start_link(ProtoMap) ->
+    gen_server:start_link(?MODULE, ProtoMap, []).
 
-init(_Args) ->
-    {ok, #map_data{}}.
+init(ProtoMap) ->
+     monitor(process, ProtoMap),
+    {ok, #map_data{proto=ProtoMap}}.
 
 terminate(_Reason, _) ->
     ok.
@@ -101,7 +103,10 @@ handle_info({'DOWN', Ref, process, Pid, _Reason}, #map_data{entities=Es}=Map) ->
     case gb_trees:lookup(Pid, Es) of
         {value, Ref} ->
             {noreply, map_remove_entity(Map, Pid)}
-        end.
+    end;
+handle_info({'DOWN', Ref, process, ProtoMap, _Reason}
+	   ,#map_data{proto=ProtoMap}=Map) ->
+    {stop, proto, Map#map_data{proto=nil}}.
 
 -ifdef(TEST).
 
