@@ -1,0 +1,4 @@
+:name "west-tek"
+:node-sname "westtek"
+:lib-dirs '("deps")
+
