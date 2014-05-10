@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 -export([add_entity/2, remove_entity/2, register/2]).
--export([init/1, terminate/2, start/1, start_link/1, handle_call/3, handle_info/2]).
+-export([init/1, terminate/2, start/0, start_link/0, start/1, start_link/1, handle_call/3, handle_info/2]).
 -export([notify/2]).
 -export([get_info/1]).
 
@@ -64,14 +64,22 @@ map_remove_entity(#map_data{entities=Es}=Map, Ent) ->
 
 %% Server
 
+start() ->
+    gen_server:start(?MODULE, null, []).
+
 start(ProtoMap) ->
     gen_server:start(?MODULE, ProtoMap, []).
+
+start_link() ->
+    gen_server:start_link(?MODULE, null, []).
 
 start_link(ProtoMap) ->
     gen_server:start_link(?MODULE, ProtoMap, []).
 
+init(null) ->
+    {ok, #map_data{}};
 init(ProtoMap) ->
-     monitor(process, ProtoMap),
+    monitor(process, ProtoMap),
     {ok, #map_data{proto=ProtoMap}}.
 
 terminate(_Reason, _) ->
