@@ -1,7 +1,7 @@
 -module(protomap).
 -behaviour(gen_server).
 
--export([get/4, get_entities/1]).
+-export([get/4, get_objects/2]).
 -export([init/1, start/1, handle_call/3]).
 
 -record(proto_map, {header
@@ -12,8 +12,8 @@
 get(Pid, X, Y, Type) ->
     gen_server:call(Pid, {get, X, Y, Type}).
 
-get_entities(Pid) ->
-    gen_server:call(Pid, get_entities).
+get_objects(Pid, Type) ->
+    gen_server:call(Pid, {get_objects, Type}).
 
 start(FileName) ->
     gen_server:start(?MODULE, FileName, []).
@@ -74,9 +74,9 @@ load_tiles(File, Tab) ->
     R().
 
 map_object_type(0) ->
-    entity;
+    critter;
 map_object_type(1) ->
-    entity;
+    item;
 map_object_type(2) ->
     scenery.
 
@@ -128,7 +128,7 @@ handle_call({get, X, Y, Type}, _From, #proto_map{hexes=Hx}=ProtoMap) ->
     Out = lists:map(fun({{_, _, Type}, Obj}) -> Obj end, Res),
     {reply, Out, ProtoMap};
 
-handle_call(get_entities, _From, #proto_map{hexes=Hx}=ProtoMap) ->
-    Res = ets:match(Hx, {{'$1','$2',entity}, '$3'}),
+handle_call({get_objects, Type}, _From, #proto_map{hexes=Hx}=ProtoMap) ->
+    Res = ets:match(Hx, {{'$1', '$2', Type}, '$3'}),
     Out = lists:map(fun([X, Y, Obj]) -> {{X, Y}, Obj} end, Res),
     {reply, Out, ProtoMap}.
