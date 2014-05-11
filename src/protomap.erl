@@ -36,7 +36,7 @@ load_properties(File, Props) ->
             %% need to put it outside to avoid needless reevaluation
             Matchers = [{"([A-Za-z0-9]+)[\\s\\t]+(-*[0-9]+)"
                         ,fun([_, P, V]) -> {get_atom(Line, P), get_integer(Line, V)} end}
-                       ,{"([A-Za-z0-9]+)[\\s\\t]+\"([^\"]+)\""
+                       ,{"([A-Za-z0-9]+)[\\s\\t]+(.+)"
                         ,fun([_, P, V]) -> {get_atom(Line, P), get_str(Line, V)} end}],
             case Line of
                 "\n" -> Props;
