@@ -12,7 +12,7 @@
 -endif.
 
 -record(map_data, {proto
-		  ,entities = gb_trees:empty()}).
+		  ,entities = gb_trees:empty()}). 
 
 %% API
 add_entity(Pid, Ent) ->
@@ -79,8 +79,21 @@ start_link(ProtoMap) ->
 init(null) ->
     {ok, #map_data{}};
 init(ProtoMap) ->
+    Scenery = lists:filtermap(fun({_Coords, Proto}) -> 
+				      case maps:find('CanUse', Proto) of
+					  {ok, 1} -> {true, Proto};
+					  {ok, _} -> false;
+					  error -> false  
+				      end
+			      end
+			     , protomap:get_objects(ProtoMap, scenery)),
+    Map  = #map_data{proto = ProtoMap},
+    Map2 = lists:foldl(fun(Proto, Curr) -> 
+			       {ok, E} = entity:start_link(Proto),
+			       map_add_entity(Curr, E)
+		       end, Map, Scenery),
     monitor(process, ProtoMap),
-    {ok, #map_data{proto=ProtoMap}}.
+    {ok, Map2}.
 
 terminate(_Reason, _) ->
     ok.
@@ -106,15 +119,17 @@ handle_call(get_info, _From, #map_data{entities=Es}=Map) ->
     {reply, #{entities_count => gb_trees:size(Es)}, Map}.
 
 
+handle_info({'DOWN', _Ref, process, ProtoMap, _Reason}
+	   ,#map_data{proto=ProtoMap}=Map) ->
+    {stop, proto, Map#map_data{proto=nil}};
+
 %% when Entity process dies, we need to remove our references to it
-handle_info({'DOWN', Ref, process, Pid, _Reason}, #map_data{entities=Es}=Map) ->
+handle_info({'DOWN', Ref, process, Pid, _Reason}
+	   , #map_data{entities = Es}=Map) ->
     case gb_trees:lookup(Pid, Es) of
         {value, Ref} ->
             {noreply, map_remove_entity(Map, Pid)}
-    end;
-handle_info({'DOWN', Ref, process, ProtoMap, _Reason}
-	   ,#map_data{proto=ProtoMap}=Map) ->
-    {stop, proto, Map#map_data{proto=nil}}.
+    end.
 
 -ifdef(TEST).
 

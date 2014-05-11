@@ -2,7 +2,8 @@
 -behaviour(gen_server).
 
 -export([register/2, notify/2, sync_notify/2, add_handler/3, call/3]).
--export([init/1, terminate/2, start/0, start_link/0, handle_call/3, handle_cast/2]).
+-export([start/0, start/1, start_link/0, start_link/1]).
+-export([init/1, terminate/2, handle_call/3, handle_cast/2]).
 -record(entity, {event_mgr}).
 
 %% API
@@ -22,7 +23,7 @@ call(Pid, Handler, Request) ->
 add_handler(Pid, Handler, Args) ->
     gen_server:call(Pid, {add_handler, Handler, Args}).
 
-init(_Args) ->
+init(Proto) ->
     {ok, EventMgr} = gen_event:start_link(),
     {ok, #entity{event_mgr=EventMgr}}.
 
@@ -30,10 +31,16 @@ terminate(_Reason, _) ->
     ok.
 
 start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+    gen_server:start_link(?MODULE, #{}, []).
+
+start_link(Proto) ->
+    gen_server:start_link(?MODULE, Proto, []).
 
 start() ->
-    gen_server:start(?MODULE, [], []).
+    gen_server:start(?MODULE, #{}, []).
+
+start(Proto) ->
+    gen_server:start(?MODULE, Proto, []).
 
 handle_call({sync_notify, Event}, _From, #entity{event_mgr=EventMgr}=E) ->
     {reply, gen_event:sync_notify(EventMgr, Event), E};
