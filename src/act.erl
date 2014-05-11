@@ -1,4 +1,4 @@
--module(activities).
+-module(act).
 
 -export([enter_map/3, exit_map/2]).
  
@@ -16,9 +16,6 @@ enter_map(Entity, Map, Coords) ->
 exit_map(Entity, Map) ->
     map:remove_entity(Map, Entity),
     map:notify(Map, {entity_left_map, Entity, Map}).
-
-move_on_map(Entity, Map, From, To) ->
-    map:notify(Map, {entity_moved_on_map, Entity, From, To, Map}).
 
 -ifdef(TEST).
 
