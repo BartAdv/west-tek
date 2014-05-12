@@ -35,9 +35,9 @@ remove_entity(#vis_data{vis_list=VisList, grid=Grid}=Vis, Coords, Ent) ->
 move_entity(#vis_data{grid=Grid}=Vis, From, To, Ent) ->
     HexFrom = sets:del_element(Ent, get_hex(Grid, From)),
     HexTo   = sets:add_element(Ent, get_hex(Grid, To)),
-    Grid2   = gb_trees:enter(From, HexFrom, Grid),
-    Grid3   = gb_trees:enter(To, HexTo, Grid2), %% don't judge me
-    Vis#vis_data{grid=Grid3}.
+    UpdateGrid = fn:comp(fn:partial(fun gb_trees:enter/3, To, HexTo)
+			,fn:partial(fun gb_trees:enter/3, From, HexFrom)),
+    Vis#vis_data{grid=UpdateGrid(Grid)}.
 
 clear(Vis) ->
     Vis#vis_data{grid=gb_trees:empty(), vis_list=gb_trees:empty()}.

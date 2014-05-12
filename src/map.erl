@@ -66,6 +66,27 @@ map_remove_entity(#map_data{entities=Es}=Map, Ent) ->
     Es2 = gb_trees:delete(Ent, Es),
     Map#map_data{entities = Es2}.
 
+map_spawn_scenery(ProtoMap, Map) ->
+    Scenery = lists:filtermap(fun({_Coords, Proto}) -> 
+				      case maps:find('CanUse', Proto) of
+					  {ok, 1} -> {true, Proto};
+					  {ok, _} -> false;
+					  error -> false  
+				      end
+			      end
+			     , protomap:get_objects(ProtoMap, scenery)),
+    lists:foldl(fun(Proto, Curr) -> 
+			{ok, E} = entity:start_link(Proto),
+			map_add_entity(Curr, E)
+		end, Map, Scenery).
+
+map_spawn_entities(ProtoMap, Map) ->
+    Entities = lists:map(fun({_Coords, Proto}) -> Proto end, protomap:get_objects(ProtoMap, critter)),
+    lists:foldl(fun(Proto, Curr) ->
+			{ok, E} = entity_mgr:add(critter, start, [Proto]),
+			map_add_entity(Curr, E)
+		end, Map, Entities).
+
 %% Server
 
 start() ->
@@ -82,29 +103,14 @@ start_link(ProtoMap) ->
 
 init(null) ->
     {ok, #map_data{}};
+
 init(ProtoMap) ->
-    Scenery = lists:filtermap(fun({_Coords, Proto}) -> 
-				      case maps:find('CanUse', Proto) of
-					  {ok, 1} -> {true, Proto};
-					  {ok, _} -> false;
-					  error -> false  
-				      end
-			      end
-			     , protomap:get_objects(ProtoMap, scenery)),
-    Map  = #map_data{proto = ProtoMap},
-    Map2 = lists:foldl(fun(Proto, Curr) -> 
-			       {ok, E} = entity:start_link(Proto),
-			       map_add_entity(Curr, E)
-		       end, Map, Scenery),
-
-    Entities = lists:map(fun({_Coords, Proto}) -> Proto end, protomap:get_objects(ProtoMap, critter)),
-    Map3 = lists:foldl(fun(Proto, Curr) ->
-			       {ok, E} = entity_mgr:add(critter, start, [Proto]),
-			       map_add_entity(Curr, E)
-		       end, Map, Entities),
-
+    Init = fn:comp(fn:partial(fun map_spawn_scenery/2, ProtoMap)
+		  ,fn:partial(fun map_spawn_entities/2, ProtoMap)),
+    Map  = Init(#map_data{proto = ProtoMap}),
+    
     monitor(process, ProtoMap),
-    {ok, Map3}.
+    {ok, Map}.
 
 terminate(_Reason, _) ->
     ok.
