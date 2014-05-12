@@ -1,7 +1,7 @@
 -module(entity_mgr).
 -behaviour(supervisor).
 
--export([start_link/0, add/4, register/1, get/1, remove/1]).
+-export([start_link/0, add/3, add/4, register/1, get/1, remove/1]).
 -export([init/1]).
 
 add(Id, Module, Func, Args) ->
@@ -10,10 +10,15 @@ add(Id, Module, Func, Args) ->
 						    1000,
 						    worker,
 						    dynamic}),
-    entity:register(Pid, Id).
+    entity:register(Pid, Id),
+    {ok, Pid}.
+
+add(Module, Func, Args) ->
+    add(uuid:uuid4(), Module, Func, Args).
 
 register(Id) ->
-    gproc:reg({n, l, {entity, Id}}, ignored).
+    true = gproc:reg({n, l, {entity, Id}}, ignored),
+    ok.
 
 get(Id) ->
     gproc:where({n, l, {entity, Id}}).

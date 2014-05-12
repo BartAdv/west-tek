@@ -4,14 +4,15 @@
 -export([add_entity/2, remove_entity/2, register/2]).
 -export([init/1, terminate/2, start/0, start_link/0, start/1, start_link/1, handle_call/3, handle_info/2]).
 -export([notify/2]).
--export([get_info/1]).
+-export([get_id/1, get_info/1]).
 
 -define(TEST, 1).
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
--record(map_data, {proto
+-record(map_data, {id
+		  ,proto
 		  ,entities = gb_trees:empty()}). 
 
 %% API
@@ -32,6 +33,9 @@ call(Pid, Handler, Request) ->
 
 notify(Pid, Event) ->
     gen_server:call(Pid, {notify, Event}).
+
+get_id(Pid) ->
+    gen_server:call(Pid, get_id).
 
 get_info(Pid) ->
     gen_server:call(Pid, get_info).
@@ -92,8 +96,15 @@ init(ProtoMap) ->
 			       {ok, E} = entity:start_link(Proto),
 			       map_add_entity(Curr, E)
 		       end, Map, Scenery),
+
+    Entities = lists:map(fun({_Coords, Proto}) -> Proto end, protomap:get_objects(ProtoMap, critter)),
+    Map3 = lists:foldl(fun(Proto, Curr) ->
+			       {ok, E} = entity_mgr:add(critter, start, [Proto]),
+			       map_add_entity(Curr, E)
+		       end, Map, Entities),
+
     monitor(process, ProtoMap),
-    {ok, Map2}.
+    {ok, Map3}.
 
 terminate(_Reason, _) ->
     ok.
@@ -113,8 +124,11 @@ handle_call({notify, Event}, _From, #map_data{entities=Es}=Map) ->
 
 handle_call({register, Id}, _From, Map) ->
     Pid = map_mgr:register(Id),
-    {reply, Pid, Map};
-    
+    {reply, Pid, Map#map_data{id=Id}};
+
+handle_call(get_id, _From, #map_data{id=Id}=Map) ->
+    {reply, Id, Map};
+
 handle_call(get_info, _From, #map_data{entities=Es}=Map) ->
     {reply, #{entities_count => gb_trees:size(Es)}, Map}.
 

@@ -55,8 +55,7 @@ handle_call({call, Handler, Request}, _From, #entity{event_mgr=EventMgr}=E) ->
     {reply, gen_event:call(EventMgr, Handler, Request), E};
 
 handle_call({register, Id}, _From, E) ->
-    Pid = entity_mgr:register(Id),
-    {reply, Pid, E}.
+    {reply, entity_mgr:register(Id), E}.
 
 handle_cast({notify, Event}, #entity{event_mgr=EventMgr}=E) ->
     gen_event:notify(EventMgr, Event),
