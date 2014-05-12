@@ -15,6 +15,7 @@ enter_map(Entity, Map, Coords) ->
 
 exit_map(Entity, Map) ->
     map:remove_entity(Map, Entity),
+    entity:notify(Entity, {entity_left_map, Entity, Map}),
     map:notify(Map, {entity_left_map, Entity, Map}).
 
 -ifdef(TEST).
