@@ -119,7 +119,8 @@ handle_event({entity_moved_on_map, Ent, From, To, _Map},
             end
     end;
 
-handle_event({where_are_you, Asking}, #vis_data{entity=Self, pos=Pos}=Vis) ->
+handle_event({where_are_you, Asking}, #vis_data{entity=Self, pos=Pos}=Vis)
+  when Asking /= Self ->
     entity:notify(Asking, {i_am_here, Self, Pos}),
     {ok, Vis};
 
@@ -239,5 +240,9 @@ position_request_range_test() ->
     entity:sync_notify(Pid, {i_am_here, E, {2,2}}),
     [{E,{1,1}}] = get_vis_list(Pid).
 
+where_are_you_self_test() ->
+    {Pid, _} = test_init({1,1}, 2),
+    entity:sync_notify(Pid, {where_are_you, Pid}),
+    [{where_are_you, Pid}] = entity:call(Pid, test_handler, dump).
 
 -endif.
