@@ -79,7 +79,7 @@ map_spawn_scenery(ProtoMap, Map) ->
 map_spawn_entities(ProtoMap, Map) ->
     Entities = lists:map(fun({_Coords, Proto}) -> Proto end, protomap:get_objects(ProtoMap, critter)),
     lists:foldl(fun(Proto, Curr) ->
-			{ok, E} = entity_mgr:add(critter, start, [Proto]),
+			{ok, E} = entity_mgr:add(critter, start_link, [Proto]),
 			map_add_entity(Curr, E)
 		end, Map, Entities).
 
@@ -129,8 +129,8 @@ handle_call({register, Id}, _From, Map) ->
     {reply, Pid, Map};
 
 handle_call(get_info, _From, #map_data{entities=Es}=Map) ->
-    {reply, #{entities_count => gb_trees:size(Es)}, Map}.
-
+    {reply, #{entities_count => gb_trees:size(Es)
+	     ,entities => lists:map(fun({E,_}) -> E end, gb_trees:to_list(Es)) }, Map}.
 
 handle_info({'DOWN', _Ref, process, ProtoMap, _Reason}
 	   ,#map_data{proto=ProtoMap}=Map) ->
