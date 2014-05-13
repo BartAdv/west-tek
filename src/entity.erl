@@ -3,7 +3,7 @@
 
 -export([register/2, notify/2, sync_notify/2, add_handler/3, call/3]).
 -export([start/0, start/1, start_link/0, start_link/1]).
--export([init/1, terminate/2, handle_call/3, handle_cast/2]).
+-export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2]).
 -record(entity, {event_mgr}).
 
 %% API
@@ -48,7 +48,8 @@ handle_call({sync_notify, Event}, _From, #entity{event_mgr=EventMgr}=E) ->
 handle_call({add_handler, Handler, Args},
             _From,
             #entity{event_mgr=EventMgr}=E) ->
-    gen_event:add_handler(EventMgr, Handler, Args),
+    %% add_sup_handler so that when component fails, we will know
+    gen_event:add_sup_handler(EventMgr, Handler, Args),
     {reply, ok, E};
 
 handle_call({call, Handler, Request}, _From, #entity{event_mgr=EventMgr}=E) ->
@@ -60,3 +61,6 @@ handle_call({register, Id}, _From, E) ->
 handle_cast({notify, Event}, #entity{event_mgr=EventMgr}=E) ->
     gen_event:notify(EventMgr, Event),
     {noreply, E}.
+
+handle_info({gen_event_EXIT, Module, Reason}, E) ->
+    {stop, {handler_crashed, Module, Reason}, E}.
