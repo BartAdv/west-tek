@@ -57,7 +57,7 @@ init({Entity, Coords, Range}) ->
 handle_event({entity_entered_map, Self, Coords, Map},
 	     #vis_data{entity=Self}=Vis) ->
     map:notify(Map, {where_are_you, Self}),	
-    {ok, Vis};
+    {ok, Vis#vis_data{pos = Coords}};
 
 handle_event({entity_entered_map, Ent, Coords, _Map},
              #vis_data{entity=Self, vis_list=VisList, grid=Grid, pos=Pos, range=Range}=Vis) ->
@@ -150,7 +150,10 @@ handle_call(get, #vis_data{vis_list=VisList}=Vis) ->
 
 handle_call({get, Coords}, #vis_data{grid=Grid}=Vis) ->
     Hex = get_hex(Grid, Coords),
-    {ok, sets:to_list(Hex), Vis}.
+    {ok, sets:to_list(Hex), Vis};
+
+handle_call(get_pos, #vis_data{pos=Pos}=Vis) ->
+    {ok, Pos, Vis}.
 
 -ifdef(TEST).
 
@@ -252,4 +255,10 @@ where_are_you_self_test() ->
     entity:sync_notify(Pid, {where_are_you, Pid}),
     [{where_are_you, Pid}] = entity:call(Pid, test_handler, dump).
 
+self_entering_map_updates_pos_test() ->
+    {Pid, _} = test_init({1,1}, 2),
+    {ok, Map} = map:start(),
+    entity:sync_notify(Pid, {entity_entered_map, Pid, {2,3}, Map}),
+    {2,3} = entity:call(Pid, vis, get_pos).
+    
 -endif.
