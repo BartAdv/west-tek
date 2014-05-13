@@ -48,6 +48,9 @@ dist({X1, Y1}, {X2, Y2}) ->
 to_local({X1, Y1}, {X2, Y2}) ->
     {X2-X1, Y2-Y1}.
 
+to_global({X1, Y1}, {X2, Y2}) ->
+    {X1+X2, Y1+Y2}.
+
 %% gen_event
 
 init({Entity, Coords, Range}) ->
@@ -57,17 +60,25 @@ init({Entity, Coords, Range}) ->
 handle_event({entity_entered_map, Self, Coords, Map},
 	     #vis_data{entity=Self}=Vis) ->
     map:notify(Map, {where_are_you, Self}),	
-    {ok, Vis#vis_data{pos = Coords}};
+    NVis = clear(Vis),
+    {ok, NVis#vis_data{pos = Coords}};
 
-handle_event({entity_entered_map, Ent, Coords, _Map},
-             #vis_data{entity=Self, vis_list=VisList, grid=Grid, pos=Pos, range=Range}=Vis) ->
-    case dist(Pos, Coords) =< Range of
-        true ->
-            Vis2 = add_entity(Vis, to_local(Pos, Coords), Ent),
-            entity:notify(Self, {entity_spotted, Ent}),
-            {ok, Vis2};
-        false ->
-            {ok, Vis}
+handle_event({entity_entered_map, Ent, Coords, Map},
+             #vis_data{entity=Self, pos=Pos, vis_list=VisList, range=Range}=Vis) ->
+    case gb_trees:lookup(Ent, VisList) of
+	{value, OldCoords} ->
+	    From = to_global(Pos, OldCoords),
+	    entity:notify(Self, {entity_moved_on_map, Ent, From, Coords, Map}),
+	    {ok, Vis};
+	none ->
+	    case dist(Pos, Coords) =< Range of
+		true ->
+		    Vis2 = add_entity(Vis, to_local(Pos, Coords), Ent),
+		    entity:notify(Self, {entity_spotted, Ent}),
+		    {ok, Vis2};
+		false ->
+		    {ok, Vis}
+	    end
     end;
 
 %% self leaves map - just clear vis data
@@ -260,5 +271,23 @@ self_entering_map_updates_pos_test() ->
     {ok, Map} = map:start(),
     entity:sync_notify(Pid, {entity_entered_map, Pid, {2,3}, Map}),
     {2,3} = entity:call(Pid, vis, get_pos).
+
+multiple_enter_map_test() ->
+    {Self, E} = test_init({1,1},5),
+    {ok, Map} = map:start(),
+    entity:sync_notify(Self, {entity_entered_map, E, {2,2}, Map}),
+    entity:sync_notify(Self, {entity_entered_map, E, {2,3}, Map}),
+    [{entity_entered_map, E, {2,2},_}
+    ,{entity_spotted, E}
+    ,{entity_entered_map, E, {2,3},_}
+    ,{entity_moved_on_map, E, {2,2}, {2,3}, _}] = entity:call(Self, test_handler, dump).
+
+self_enter_map_clears_vis_test() ->
+    {Self, E} = test_init({1,1},2),
+    {ok, Map} = map:start(),
+    entity:sync_notify(Self, {i_am_here, E, {2,2}}),
+    [{E,_}] = get_vis_list(Self),
+    entity:sync_notify(Self, {entity_entered_map, Self, {3,4}, Map}),
+    [] = get_vis_list(Self).
     
 -endif.
