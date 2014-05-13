@@ -1,7 +1,7 @@
 -module(entity_mgr).
 -behaviour(supervisor).
 
--export([start_link/0, add/3, add/4, register/1, get/1, remove/1]).
+-export([start/0, start_link/0, add/3, add/4, register/1, get/1, remove/1]).
 -export([init/1]).
 
 add(Id, Module, Func, Args) ->
@@ -29,6 +29,11 @@ remove(Id) ->
 
 start_link() ->
     supervisor:start_link({local, entity_mgr}, ?MODULE, []).
+
+start() ->
+    {ok, Pid} = start_link(), 
+    unlink(Pid),
+    {ok, Pid}.
 
 init(_Args) ->
     {ok, {{one_for_one, 10, 60}, []}}.
