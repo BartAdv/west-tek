@@ -56,7 +56,7 @@ init({Entity, Coords, Range}) ->
 %% self entering the map - 'ask' everyone about their location
 handle_event({entity_entered_map, Self, Coords, Map},
 	     #vis_data{entity=Self}=Vis) ->
-    map:notify(Map, {where_are_you, Self}),
+    map:notify(Map, {where_are_you, Self}),	
     {ok, Vis};
 
 handle_event({entity_entered_map, Ent, Coords, _Map},
@@ -239,6 +239,13 @@ position_request_range_test() ->
     [] = get_vis_list(Pid),
     entity:sync_notify(Pid, {i_am_here, E, {2,2}}),
     [{E,{1,1}}] = get_vis_list(Pid).
+
+position_request_self_only_test() ->
+    {Pid, E} = test_init({1,1},1),
+    {ok, Map} = map:start(),
+    map:add_entity(Map, Pid),
+    entity:sync_notify(Pid, {entity_entered_map, E, {1,1}, Map}),
+    [{entity_entered_map, E, {1,1}, Map}, {entity_spotted, E}] = entity:call(Pid, test_handler, dump).
 
 where_are_you_self_test() ->
     {Pid, _} = test_init({1,1}, 2),
