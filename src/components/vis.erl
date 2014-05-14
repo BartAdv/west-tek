@@ -88,7 +88,7 @@ handle_event({entity_left_map, Self, _Map},
 
 %% some other entity leaves map
 handle_event({entity_left_map, Ent, _Map},
-             #vis_data{entity=Self, vis_list=VisList, grid=Grid}=Vis) ->
+             #vis_data{entity=Self, vis_list=VisList}=Vis) ->
     case gb_trees:lookup(Ent, VisList) of
         {value, Coords} ->
             Vis2 = remove_entity(Vis, Coords, Ent),
@@ -98,19 +98,19 @@ handle_event({entity_left_map, Ent, _Map},
     end;
 
 %% self moves on map - recreate
-handle_event({entity_moved_on_map, Self, From, To, Map},
-	     #vis_data{entity=Self, pos=Pos}=Vis) ->
+handle_event({entity_moved_on_map, Self, _From, To, Map},
+	     #vis_data{entity=Self}=Vis) ->
     Vis2 = clear(Vis),
     map:notify(Map, {where_are_you, Self}),
     {ok, Vis2#vis_data{pos=To}};
 
 %% some other entity moves on map
 handle_event({entity_moved_on_map, Ent, From, To, _Map},
-             #vis_data{entity=Self, vis_list=VisList, grid=Grid, pos=Pos, range=Range}=Vis) ->
+             #vis_data{entity=Self, vis_list=VisList, pos=Pos, range=Range}=Vis) ->
     LocalFrom = to_local(Pos, From),
     LocalTo = to_local(Pos, To),
     case gb_trees:lookup(Ent, VisList) of
-        {value, Coords} ->
+        {value, _} ->
             case dist(Pos, To) =< Range of
                 true ->
                     {ok, move_entity(Vis, LocalFrom, LocalTo, Ent)};
