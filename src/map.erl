@@ -62,6 +62,11 @@ map_remove_entity(#map_data{entities=Es}=Map, Ent) ->
     Es2 = gb_trees:delete(Ent, Es),
     Map#map_data{entities = Es2}.
 
+scenery(_Proto) ->
+    {ok, Pid} = entity:start_link(),
+    %% add scenery handler with Proto data
+    Pid.
+
 map_spawn_scenery(ProtoMap, Map) ->
     Scenery = lists:filtermap(fun({_Coords, Proto}) -> 
 				      case maps:find('CanUse', Proto) of
@@ -72,14 +77,13 @@ map_spawn_scenery(ProtoMap, Map) ->
 			      end
 			     , protomap:get_objects(ProtoMap, scenery)),
     lists:foldl(fun(Proto, Curr) -> 
-			{ok, E} = entity:start_link(Proto),
-			map_add_entity(Curr, E)
+			map_add_entity(Curr, scenery(Proto))
 		end, Map, Scenery).
 
 map_spawn_entities(ProtoMap, Map) ->
     Entities = lists:map(fun({_Coords, Proto}) -> Proto end, protomap:get_objects(ProtoMap, critter)),
     lists:foldl(fun(Proto, Curr) ->
-			{ok, E} = entity_mgr:add(critter, start_link, [Proto]),
+			{ok, E} = entity_mgr:add(critter, start_link, #{proto => Proto}),
 			map_add_entity(Curr, E)
 		end, Map, Entities).
 

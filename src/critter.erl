@@ -4,17 +4,18 @@
 
 -export([start/1, start_link/1]).
 
-init(Proto, Pid) ->
+init(Data, Pid) ->
+    #{proto := Proto} = Data,
     #{'MapX' := MapX ,'MapY' := MapY} = Proto,
     entity:add_handler(Pid, vis, {Pid, {MapX, MapY}, 10}),
     entity:add_handler(Pid, map_entity, {none, MapX, MapY}).
 
-start(Proto) ->
+start(Data) ->
     {ok, Pid} = entity:start(),
-    init(Proto, Pid),
+    init(Data, Pid),
     {ok, Pid}.
 
-start_link(Proto) ->
+start_link(Data) ->
     {ok, Pid} = entity:start_link(),
-    init(Proto, Pid),
+    init(Data, Pid),
     {ok, Pid}.
