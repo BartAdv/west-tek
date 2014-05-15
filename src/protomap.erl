@@ -29,32 +29,34 @@ get_integer(Str, R) ->
 get_atom(Str, R) ->
     list_to_atom(get_str(Str, R)).
 
-load_properties(File, Props) ->
+get_prop_matchers() ->
+    lists:map(fun({Re, M}) -> {ok, C} = re:compile(Re), {C, M} end
+	     ,[{"([A-Za-z0-9]+)[\\s\\t]+(-*[0-9]+)"
+	       ,fun(L, [_, P, V]) -> {get_atom(L, P), get_integer(L, V)} end}
+	      ,{"([A-Za-z0-9]+)[\\s\\t]+(.+)"
+	       ,fun(L, [_, P, V]) -> {get_atom(L, P), get_str(L, V)} end}]).
+
+load_properties(File, Matchers, Props) ->
     case file:read_line(File) of
-        eof -> Props;
-        {ok, Line} ->
-            %% need to put it outside to avoid needless reevaluation
-            Matchers = [{"([A-Za-z0-9]+)[\\s\\t]+(-*[0-9]+)"
-                        ,fun([_, P, V]) -> {get_atom(Line, P), get_integer(Line, V)} end}
-                       ,{"([A-Za-z0-9]+)[\\s\\t]+(.+)"
-                        ,fun([_, P, V]) -> {get_atom(Line, P), get_str(Line, V)} end}],
-            case Line of
-                "\n" -> Props;
-                _ ->
-                    Match = fun Match([{R,F}|T]) ->
-                                    case re:run(Line, R) of
-                                        {match, M} ->
-                                            {P,V} = F(M),
-                                            load_properties(File, maps:put(P, V, Props));
-                                        nomatch ->
-                                            case T of
-                                                [] -> load_properties(File, Props);
-                                                _ -> Match(T)
-                                            end
-                                    end
-                            end,
-                    Match(Matchers)
-            end
+	eof -> Props;
+	{ok, Line} ->
+	    case Line of
+		"\n" -> Props;
+		_ ->
+		    Match = fun Match([{R,F}|T]) ->
+				    case re:run(Line, R) of
+					{match, M} ->
+					    {P,V} = F(Line, M),
+					    load_properties(File, Matchers, maps:put(P, V, Props));
+					nomatch ->
+					    case T of
+						[] -> load_properties(File, Matchers, Props);
+						_ -> Match(T)
+					    end
+				    end
+			    end,
+		    Match(Matchers)
+	    end
     end.
 
 load_tiles(File, Tab) ->
@@ -80,7 +82,7 @@ map_object_type(1) ->
 map_object_type(2) ->
     scenery.
 
-load_objects(File, Tab) ->
+load_objects(File, Matchers, Tab) ->
     {ok, Re} = re:compile("MapObjType[\\s\\t]+([0-9]+)"),
     R = fun R() ->
                 case file:read_line(File) of
@@ -88,7 +90,7 @@ load_objects(File, Tab) ->
                         case re:run(Line, Re) of
                             {match, [_, T]} ->
                                 Type = map_object_type(get_integer(Line, T)),
-                                Obj = load_properties(File, #{}),
+                                Obj = load_properties(File, Matchers, #{}),
                                 #{'MapX':=X, 'MapY':=Y} = Obj,
                                 ets:insert(Tab, {{X, Y, Type}, Obj}), 
                                 R();
@@ -100,15 +102,16 @@ load_objects(File, Tab) ->
     R().
 
 load_protomap(File, #proto_map{hexes=Hexes}=ProtoMap) ->
+    Matchers = get_prop_matchers(),
     case file:read_line(File) of
         {ok, "[Header]\n"} ->
-            Header = load_properties(File, #{}),
+            Header = load_properties(File, Matchers, #{}),
             load_protomap(File, ProtoMap#proto_map{header=Header});
         {ok, "[Tiles]\n"} ->
             Hexes = load_tiles(File, Hexes),
             load_protomap(File, ProtoMap);
         {ok, "[Objects]\n"} ->
-            Hexes = load_objects(File, Hexes),
+            Hexes = load_objects(File, Matchers, Hexes),
             load_protomap(File, ProtoMap);
         eof ->
             ProtoMap;
