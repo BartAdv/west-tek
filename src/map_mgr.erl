@@ -10,7 +10,7 @@ add(Id, Module, Func, Args) ->
 						 1000,
 						 worker,
 						 dynamic}),
-    map:register(Pid, Id).
+    {ok, Pid}.
 
 register(Id) ->
     gproc:reg({n, l, {map, Id}}, ignored).

@@ -8,7 +8,8 @@ init(Data, Pid) ->
     #{proto := Proto} = Data,
     #{'MapX' := MapX ,'MapY' := MapY} = Proto,
     entity:add_handler(Pid, vis, {Pid, {MapX, MapY}, 10}),
-    entity:add_handler(Pid, map_entity, {none, MapX, MapY}).
+    #{'MapId' := MapId} = Data, 
+    entity:add_handler(Pid, map_entity, {Pid, {MapId, MapX, MapY}}).
 
 start(Data) ->
     {ok, Pid} = entity:start(),
@@ -16,6 +17,7 @@ start(Data) ->
     {ok, Pid}.
 
 start_link(Data) ->
-    {ok, Pid} = entity:start_link(),
+    #{id := Id} = Data,
+    {ok, Pid} = entity:start_link(Id),
     init(Data, Pid),
     {ok, Pid}.

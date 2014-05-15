@@ -4,7 +4,9 @@
 -export([notify/2, sync_notify/2, add_handler/3, call/3]).
 -export([start/0, start/1, start_link/0, start_link/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2]).
--record(entity, {event_mgr}).
+
+-record(entity, {id = uuid:uuid4()
+		,event_mgr}).
 
 %% API
 

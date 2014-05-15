@@ -1,8 +1,9 @@
 -module(map).
 -behaviour(gen_server).
 
--export([add_entity/2, remove_entity/2, register/2]).
--export([init/1, terminate/2, start/0, start_link/0, start/1, start_link/1, handle_call/3, handle_info/2]).
+-export([add_entity/2, remove_entity/2]).
+-export([init/1, terminate/2, start/0, start_link/0, start/2, start_link/2]).
+-export([handle_call/3, handle_info/2]).
 -export([notify/2]).
 -export([get_info/1]).
 
@@ -20,9 +21,6 @@ add_entity(Pid, Ent) ->
 
 remove_entity(Pid, Ent) ->
     gen_server:call(Pid, {remove_entity, Ent}).
-
-register(Pid, Id) ->
-    gen_server:call(Pid, {register, Id}).
 
 add_handler(Pid, Handler, Args) ->
     gen_server:call(Pid, {add_handler, Handler, Args}).
@@ -48,13 +46,10 @@ iter_entities(Es, F) ->
     Fr(gb_trees:iterator(Es)).
 
 map_add_entity(#map_data{entities=Es}=Map, Ent) ->
-    case gb_trees:is_defined(Ent, Es) of
-        false ->
-            Ref = monitor(process, Ent),
-            Es2 = gb_trees:insert(Ent, Ref, Es),
-            Map#map_data{entities=Es2};
-        true -> already_added
-end.
+    Ref = monitor(process, Ent),
+    Es2 = gb_trees:insert(Ent, Ref, Es),
+    Map#map_data{entities=Es2}.
+
 
 map_remove_entity(#map_data{entities=Es}=Map, Ent) ->
     Ref = gb_trees:get(Ent, Es),
@@ -80,10 +75,12 @@ map_spawn_scenery(ProtoMap, Map) ->
 			map_add_entity(Curr, scenery(Proto))
 		end, Map, Scenery).
 
-map_spawn_entities(ProtoMap, Map) ->
+map_spawn_entities(ProtoMap, MapId, Map) ->
     Entities = lists:map(fun({_Coords, Proto}) -> Proto end, protomap:get_objects(ProtoMap, critter)),
     lists:foldl(fun(Proto, Curr) ->
-			{ok, E} = entity_mgr:add(critter, start_link, #{proto => Proto}),
+			{ok, E} = entity_mgr:add(critter, start_link, 
+						 #{proto => Proto
+						  ,'MapId' => MapId}),
 			map_add_entity(Curr, E)
 		end, Map, Entities).
 
@@ -92,34 +89,32 @@ map_spawn_entities(ProtoMap, Map) ->
 start() ->
     gen_server:start(?MODULE, null, []).
 
-start(ProtoMap) ->
-    gen_server:start(?MODULE, ProtoMap, []).
+start(Id, ProtoMap) ->
+    gen_server:start(?MODULE, {Id, ProtoMap}, []).
 
 start_link() ->
     gen_server:start_link(?MODULE, null, []).
 
-start_link(ProtoMap) ->
-    gen_server:start_link(?MODULE, ProtoMap, []).
+start_link(Id, ProtoMap) ->
+    gen_server:start_link(?MODULE, {Id, ProtoMap}, []).
 
 init(null) ->
     {ok, #map_data{}};
+init({Id, ProtoMap}) ->
+    map_mgr:register(Id),
 
-init(ProtoMap) ->
     Init = fn:comp(fn:partial(fun map_spawn_scenery/2, ProtoMap)
-		  ,fn:partial(fun map_spawn_entities/2, ProtoMap)),
+		  ,fn:partial(fun map_spawn_entities/3, ProtoMap, Id)),
     Map  = Init(#map_data{proto = ProtoMap}),
     
     monitor(process, ProtoMap),
     {ok, Map}.
-
+ 
 terminate(_Reason, _) ->
     ok.
 
 handle_call({add_entity, Ent}, _From, Map) ->
-    case map_add_entity(Map, Ent) of
-        already_added -> {reply, already_added, Map};
-        NewMap -> {reply, ok, NewMap}
-    end;
+    {reply, ok, map_add_entity(Map, Ent)};
 
 handle_call({remove_entity, Ent}, _From, Map) ->
     {reply, ok, map_remove_entity(Map, Ent)};
@@ -127,10 +122,6 @@ handle_call({remove_entity, Ent}, _From, Map) ->
 handle_call({notify, Event}, _From, #map_data{entities=Es}=Map) ->
     iter_entities(Es, fun(Ent) -> entity:notify(Ent, Event) end),
     {reply, ok, Map};
-
-handle_call({register, Id}, _From, Map) ->
-    Pid = map_mgr:register(Id),
-    {reply, Pid, Map};
 
 handle_call(get_info, _From, #map_data{entities=Es}=Map) ->
     {reply, #{entities_count => gb_trees:size(Es)
@@ -159,11 +150,5 @@ add_remove_test() ->
     map:add_entity(Pid, Cr),
     map:remove_entity(Pid, Cr),
     ok=map:add_entity(Pid, Cr).
-
-cannot_add_already_added_test() ->
-    Cr = test_entity(),
-    {ok, Pid} = map:start_link(),
-    map:add_entity(Pid, Cr),
-    already_added = map:add_entity(Pid, Cr).
 
 -endif.
