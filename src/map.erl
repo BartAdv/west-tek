@@ -89,24 +89,25 @@ map_spawn_entities(ProtoMap, MapId, Map) ->
 start() ->
     gen_server:start(?MODULE, null, []).
 
-start(Id, ProtoMap) ->
-    gen_server:start(?MODULE, {Id, ProtoMap}, []).
+start(Id, ProtoName) ->
+    gen_server:start(?MODULE, {Id, ProtoName}, []).
 
 start_link() ->
     gen_server:start_link(?MODULE, null, []).
 
-start_link(Id, ProtoMap) ->
-    gen_server:start_link(?MODULE, {Id, ProtoMap}, []).
+start_link(Id, ProtoName) ->
+    gen_server:start_link(?MODULE, {Id, ProtoName}, []).
 
 init(null) ->
     {ok, #map_data{}};
-init({Id, ProtoMap}) ->
-    map_mgr:register(Id),
+init({Id, ProtoName}) ->
+    ProtoMap = protomap_mgr:get(ProtoName),
 
     Init = fn:comp(fn:partial(fun map_spawn_scenery/2, ProtoMap)
 		  ,fn:partial(fun map_spawn_entities/3, ProtoMap, Id)),
     Map  = Init(#map_data{proto = ProtoMap}),
     
+    map_mgr:register(Id),
     monitor(process, ProtoMap),
     {ok, Map}.
  

@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 -export([get/4, get_objects/2]).
--export([init/1, start/1, handle_call/3]).
+-export([init/1, start/1, start_link/1, handle_call/3]).
 
 -include("properties.hrl").
 
@@ -19,6 +19,9 @@ get_objects(Pid, Type) ->
 
 start(FileName) ->
     gen_server:start(?MODULE, FileName, []).
+
+start_link(FileName) ->
+    gen_server:start_link(?MODULE, FileName, []).
 
 get_prop_matchers() ->
     lists:map(fun({Re, M}) -> {ok, C} = re:compile(Re), {C, M} end
@@ -92,6 +95,7 @@ load_protomap(File, #proto_map{hexes=Hexes}=ProtoMap) ->
 init(FileName) ->
     {ok, File} = file:open(FileName, read),
     Hexes = ets:new(hexes, [duplicate_bag]),
+    protomap_mgr:register(FileName),
     {ok, load_protomap(File, #proto_map{hexes=Hexes})}.
 
 handle_call({get, X, Y, Type}, _From, #proto_map{hexes=Hx}=ProtoMap) ->

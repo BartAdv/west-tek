@@ -1,16 +1,20 @@
 -module(map_mgr).
 -behaviour(supervisor).
 
--export([start_link/0, add/4, register/1, get/1, remove/1]).
--export([init/1]).
+-export([start_link/0, add/2, register/1, get/1, remove/1]).
+-export([init/1, start_map/2]).
 
-add(Id, Module, Func, Args) ->
-    {ok, Pid} = supervisor:start_child(map_mgr, {Id, {Module, Func, Args}, 
+add(Id, ProtoId) ->
+    {ok, Pid} = supervisor:start_child(map_mgr, {Id, {map_mgr, start_map, [Id, ProtoId]}, 
 						 permanent, 
 						 1000,
 						 worker,
 						 dynamic}),
     {ok, Pid}.
+
+start_map(Id, ProtoId) ->
+    ProtoMap = protomap_mgr:get(ProtoId),
+    map:start_link(Id, ProtoMap).
 
 register(Id) ->
     gproc:reg({n, l, {map, Id}}, ignored).
