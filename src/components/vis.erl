@@ -3,6 +3,8 @@
 
 -export([init/1, handle_event/2, handle_call/2]).
 
+-include("../hex.hrl").
+
 -define(TEST, 1).
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -41,9 +43,6 @@ move_entity(#vis_data{grid=Grid}=Vis, From, To, Ent) ->
 
 clear(Vis) ->
     Vis#vis_data{grid=gb_trees:empty(), vis_list=gb_trees:empty()}.
-
-dist({X1, Y1}, {X2, Y2}) ->
-    math:sqrt((X1-X2)*(X1-X2) + ((Y1-Y2)*(Y1-Y2))).
 
 to_local({X1, Y1}, {X2, Y2}) ->
     {X2-X1, Y2-Y1}.
