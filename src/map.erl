@@ -5,7 +5,7 @@
 -export([init/1, terminate/2, start/0, start_link/0, start/2, start_link/2]).
 -export([handle_call/3, handle_info/2]).
 -export([notify/2]).
--export([get_info/1]).
+-export([get_proto/1, get_info/1]).
 
 -define(TEST, 1).
 -ifdef(TEST).
@@ -30,6 +30,9 @@ call(Pid, Handler, Request) ->
 
 notify(Pid, Event) ->
     gen_server:call(Pid, {notify, Event}).
+
+get_proto(Pid) ->
+    gen_server:call(Pid, get_proto).
 
 get_info(Pid) ->
     gen_server:call(Pid, get_info).
@@ -123,6 +126,9 @@ handle_call({remove_entity, Ent}, _From, Map) ->
 handle_call({notify, Event}, _From, #map_data{entities=Es}=Map) ->
     iter_entities(Es, fun(Ent) -> entity:notify(Ent, Event) end),
     {reply, ok, Map};
+
+handle_call(get_proto, _From, #map_data{proto=ProtoMap}=Map) ->
+    {reply, ProtoMap, Map};
 
 handle_call(get_info, _From, #map_data{entities=Es}=Map) ->
     {reply, #{entities_count => gb_trees:size(Es)

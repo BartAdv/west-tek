@@ -4,6 +4,8 @@
 
 init() ->
     application:start(gproc),
+    protomap_mgr:start(),
+    map_mgr:start(),
     entity_mgr:start().
 
 restart_entity_mgr() ->

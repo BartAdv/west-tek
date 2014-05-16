@@ -44,12 +44,6 @@ move_entity(#vis_data{grid=Grid}=Vis, From, To, Ent) ->
 clear(Vis) ->
     Vis#vis_data{grid=gb_trees:empty(), vis_list=gb_trees:empty()}.
 
-to_local({X1, Y1}, {X2, Y2}) ->
-    {X2-X1, Y2-Y1}.
-
-to_global({X1, Y1}, {X2, Y2}) ->
-    {X1+X2, Y1+Y2}.
-
 %% gen_event
 
 init({Entity, Coords, Range}) ->
@@ -65,14 +59,13 @@ handle_event({entity_entered_map, Self, Coords, Map},
 handle_event({entity_entered_map, Ent, Coords, Map},
              #vis_data{entity=Self, pos=Pos, vis_list=VisList, range=Range}=Vis) ->
     case gb_trees:lookup(Ent, VisList) of
-	{value, OldCoords} ->
-	    From = to_global(Pos, OldCoords),
+	{value, From} ->
 	    entity:notify(Self, {entity_moved_on_map, Ent, From, Coords, Map}),
 	    {ok, Vis};
 	none ->
 	    case dist(Pos, Coords) =< Range of
 		true ->
-		    Vis2 = add_entity(Vis, to_local(Pos, Coords), Ent),
+		    Vis2 = add_entity(Vis, Coords, Ent),
 		    entity:notify(Self, {entity_spotted, Ent}),
 		    {ok, Vis2};
 		false ->
@@ -99,6 +92,7 @@ handle_event({entity_left_map, Ent, _Map},
 %% self moves on map - recreate
 handle_event({entity_moved_on_map, Self, _From, To, Map},
 	     #vis_data{entity=Self}=Vis) ->
+    
     Vis2 = clear(Vis),
     map:notify(Map, {where_are_you, Self}),
     {ok, Vis2#vis_data{pos=To}};
@@ -106,22 +100,20 @@ handle_event({entity_moved_on_map, Self, _From, To, Map},
 %% some other entity moves on map
 handle_event({entity_moved_on_map, Ent, From, To, _Map},
              #vis_data{entity=Self, vis_list=VisList, pos=Pos, range=Range}=Vis) ->
-    LocalFrom = to_local(Pos, From),
-    LocalTo = to_local(Pos, To),
     case gb_trees:lookup(Ent, VisList) of
         {value, _} ->
             case dist(Pos, To) =< Range of
                 true ->
-                    {ok, move_entity(Vis, LocalFrom, LocalTo, Ent)};
+                    {ok, move_entity(Vis, From, To, Ent)};
                 false ->
-                    Vis2 = remove_entity(Vis, LocalFrom, Ent),
+                    Vis2 = remove_entity(Vis, From, Ent),
                     entity:notify(Self, {entity_out_of_sight, Ent}),
                     {ok, Vis2}
             end;
         none ->
             case dist(Pos, To) =< Range of
                 true ->
-                    Vis2 = add_entity(Vis, LocalTo, Ent),
+                    Vis2 = add_entity(Vis, To, Ent),
                     entity:notify(Self, {entity_spotted, Ent}),
                     {ok, Vis2};
                 false ->
@@ -142,7 +134,7 @@ handle_event({i_am_here, Who, Coords},
 	     #vis_data{pos=Pos, range=Range}=Vis) ->
     case dist(Pos, Coords) =< Range of
 	true ->
-	    Vis2 = add_entity(Vis, to_local(Pos, Coords), Who),
+	    Vis2 = add_entity(Vis, Coords, Who),
 	    {ok, Vis2};
 	false ->
 	    {ok, Vis}
@@ -184,7 +176,7 @@ get(Pid, Coords) ->
 in_range_test() ->
     {Pid, E} = test_init({1,1}, 10),
     entity:sync_notify(Pid, {entity_entered_map, E, {2, 2}, nil}),
-    [E|_] = get(Pid, {1, 1}).
+    [E|_] = get(Pid, {2, 2}).
 
 out_of_range_test() ->
     {Pid, E} = test_init({1,1}, 1),
@@ -202,14 +194,14 @@ moving_in_range_test() ->
     entity:sync_notify(Pid, {entity_entered_map, E, {2, 2}, nil}),
     entity:sync_notify(Pid, {entity_moved_on_map, E, {2, 2}, {3, 3}, nil}),
     [] = get(Pid, {1, 1}),
-    [E|_] = get(Pid, {2, 2}).
+    [E|_] = get(Pid, {3, 3}).
 
 moving_into_the_range_test() ->
     {Pid, E} = test_init({1, 1}, 2),
     entity:sync_notify(Pid, {entity_entered_map, E, {5, 5}, nil}),
     entity:sync_notify(Pid, {entity_moved_on_map, E, {5, 5}, {2, 2}, nil}),
     [] = get(Pid, {4, 4}),
-    [E|_] = get(Pid, {1, 1}).
+    [E|_] = get(Pid, {2, 2}).
 
 moving_out_of_the_range_test() ->
     {Pid, E} = test_init({1, 1}, 2),
@@ -251,7 +243,7 @@ position_request_range_test() ->
     entity:sync_notify(Pid, {i_am_here, E, {5,5}}),
     [] = get_vis_list(Pid),
     entity:sync_notify(Pid, {i_am_here, E, {2,2}}),
-    [{E,{1,1}}] = get_vis_list(Pid).
+    [{E,{2,2}}] = get_vis_list(Pid).
 
 position_request_self_only_test() ->
     {Pid, E} = test_init({1,1},1),

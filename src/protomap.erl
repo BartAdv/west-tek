@@ -1,10 +1,13 @@
 -module(protomap).
 -behaviour(gen_server).
 
--export([get/4, get_objects/2]).
+-export([get/4, get_objects/2, get_at_range/4]).
 -export([init/1, start/1, start_link/1, handle_call/3]).
 
+-include_lib("stdlib/include/qlc.hrl").
+
 -include("properties.hrl").
+-include("hex.hrl").
 
 -record(proto_map, {header
                    ,hexes}).
@@ -16,6 +19,9 @@ get(Pid, X, Y, Type) ->
 
 get_objects(Pid, Type) ->
     gen_server:call(Pid, {get_objects, Type}).
+
+get_at_range(Pid, Origin, Range, Types) ->
+    gen_server:call(Pid, {get_at_range, Origin, Range, Types}).
 
 start(FileName) ->
     gen_server:start(?MODULE, FileName, []).
@@ -106,4 +112,12 @@ handle_call({get, X, Y, Type}, _From, #proto_map{hexes=Hx}=ProtoMap) ->
 handle_call({get_objects, Type}, _From, #proto_map{hexes=Hx}=ProtoMap) ->
     Res = ets:match(Hx, {{'$1', '$2', Type}, '$3'}),
     Out = lists:map(fun([X, Y, Obj]) -> {{X, Y}, Obj} end, Res),
-    {reply, Out, ProtoMap}.
+    {reply, Out, ProtoMap};
+
+handle_call({get_at_range, Origin, Range, Types}, _From, #proto_map{hexes=Hx}=ProtoMap) ->
+    Table = ets:table(Hx),
+    Q = qlc:q([{X, Y, Data} || T <- Types
+				   ,{{X, Y, Type}, Data} <- Table
+				   , Type == T
+				   , dist(Origin, {X, Y}) == Range]),
+    {reply, qlc:e(Q), ProtoMap}.

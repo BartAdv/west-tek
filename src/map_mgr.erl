@@ -1,7 +1,7 @@
 -module(map_mgr).
 -behaviour(supervisor).
 
--export([start_link/0, add/2, register/1, get/1, remove/1]).
+-export([start/0, start_link/0, add/2, register/1, get/1, remove/1]).
 -export([init/1, start_map/2]).
 
 add(Id, ProtoId) ->
@@ -28,6 +28,11 @@ remove(Id) ->
 
 start_link() ->
     supervisor:start_link({local, map_mgr}, ?MODULE, []).
-
+   
+start() ->
+    {ok, Pid} = start_link(), 
+    unlink(Pid),
+    {ok, Pid}.
+   
 init(_Args) ->
     {ok, {{one_for_one, 10, 60}, []}}.
