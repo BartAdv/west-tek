@@ -1,0 +1,13 @@
+{application, fonline,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+		  westtek
+                 ]},
+  {mod, { fonline_app, []}},
+  {env, []}
+ ]}.

@@ -23,4 +23,7 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, []} }.
+    {ok, { {one_for_one, 5, 10}, 
+	   [?CHILD(protomap_mgr, supervisor)
+	   ,?CHILD(map_mgr, supervisor)
+	   ,?CHILD(entity_mgr, supervisor)]} }.
