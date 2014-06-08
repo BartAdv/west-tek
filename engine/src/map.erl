@@ -1,4 +1,5 @@
 -module(map).
+-compile([{parse_transform, lager_transform}]).
 -behaviour(gen_server).
 
 -export([add_entity/2, remove_entity/2]).
@@ -65,7 +66,7 @@ scenery(_Proto) ->
     %% add scenery handler with Proto data
     Pid.
 
-map_spawn_scenery(ProtoMap, Map) ->
+map_spawn_scenery(ProtoMap, MapData) ->
     Scenery = lists:filtermap(fun({_Coords, Proto}) -> 
 				      case maps:find('CanUse', Proto) of
 					  {ok, 1} -> {true, Proto};
@@ -76,16 +77,16 @@ map_spawn_scenery(ProtoMap, Map) ->
 			     , protomap:get_objects(ProtoMap, scenery)),
     lists:foldl(fun(Proto, Curr) -> 
 			map_add_entity(Curr, scenery(Proto))
-		end, Map, Scenery).
+		end, MapData, Scenery).
 
-map_spawn_entities(ProtoMap, MapId, Map) ->
+map_spawn_entities(ProtoMap, MapId, MapData) ->
     Entities = lists:map(fun({_Coords, Proto}) -> Proto end, protomap:get_objects(ProtoMap, critter)),
     lists:foldl(fun(Proto, Curr) ->
 			{ok, E} = entity_mgr:add(critter, start_link, 
 						 #{proto => Proto
 						  ,'MapId' => MapId}),
 			map_add_entity(Curr, E)
-		end, Map, Entities).
+		end, MapData, Entities).
 
 %% Server
 
@@ -104,15 +105,16 @@ start_link(Id, ProtoMap) ->
 init(null) ->
     {ok, #map_data{}};
 init({Id, ProtoMap}) ->
+    map_mgr:register(Id),
     Init = fn:comp(fn:partial(fun map_spawn_scenery/2, ProtoMap)
 		  ,fn:partial(fun map_spawn_entities/3, ProtoMap, Id)),
     Map  = Init(#map_data{proto = ProtoMap}),
     
-    map_mgr:register(Id),
     monitor(process, ProtoMap),
     {ok, Map}.
  
-terminate(_Reason, _) ->
+terminate(Reason, _) ->
+    lager:error("Map terminating: ~p", [Reason]),
     ok.
 
 handle_call({add_entity, Ent}, _From, Map) ->

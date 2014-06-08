@@ -6,8 +6,9 @@
 
 -export([init/1, handle_event/2]).
 
-init({Self, {MapId, _MapX, _MapY}=Origin}) ->
-    Map = case map_mgr:get(MapId) of undefined -> none; Pid -> Pid end,
+init({Self, {MapId, MapX, MapY}=Origin}) ->
+    Map = map_mgr:get(MapId),
+    entity:notify(Self, {entity_entered_map, Self, {MapX, MapY}, Map}),
     {ok, {Self, Map, Origin}}. 
 
 %% tick is not designed/implemented yet
