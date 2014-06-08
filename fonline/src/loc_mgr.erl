@@ -42,8 +42,9 @@ load_area(File, Area) ->
 		    {ok, [_], Name} = io_lib:fread("~s ", Rest),
 		    load_area(File, Area#{name => string:strip(Name, both, $\n)});
 		"map_" ++ Rest ->
-		    {ok, [Index, MapName, ProtoId], _} = io_lib:fread("~d = ~s~d", Rest),
-		    #{maps := Maps} = maps:merge(Area, #{maps => #{}}),
+		    {ok, [Index, MapName_, ProtoId], _} = io_lib:fread("~d = ~s~d", Rest),
+		    MapName = string:strip(MapName_, right, $*),
+		    #{maps := Maps} = maps:merge(#{maps => #{}}, Area),
 		    load_area(File, Area#{maps => maps:put(Index, #{name => MapName, pid => ProtoId}, Maps)});
 		"size" ++ Rest ->
 		    [Size] = scanf(" =~d", Rest),
