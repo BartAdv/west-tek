@@ -99,9 +99,9 @@ load_protomap(File, #proto_map{hexes=Hexes}=ProtoMap) ->
     end.
 
 init(FileName) ->
+    protomap_mgr:register(FileName),
     {ok, File} = file:open(FileName, read),
     Hexes = ets:new(hexes, [duplicate_bag]),
-    protomap_mgr:register(FileName),
     {ok, load_protomap(File, #proto_map{hexes=Hexes})}.
 
 handle_call({get, X, Y, Type}, _From, #proto_map{hexes=Hx}=ProtoMap) ->

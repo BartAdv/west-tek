@@ -6,15 +6,21 @@
 
 add(Id, ProtoId) ->
     {ok, Pid} = supervisor:start_child(map_mgr, {Id, {map_mgr, start_map, [Id, ProtoId]}, 
-						 permanent, 
+						 transient, 
 						 1000,
 						 worker,
 						 dynamic}),
     {ok, Pid}.
 
 start_map(Id, ProtoId) ->
-    ProtoMap = protomap_mgr:get(ProtoId),
-    map:start_link(Id, ProtoMap).
+    case protomap_mgr:get(ProtoId) of
+	{ok, ProtoMap} -> 
+	    io:format("Spawning map {~w, \"~s\"}~n", [Id, ProtoId]),
+	    map:start_link(Id, ProtoMap);
+	{error, Reason} -> 
+	    io:format("Unable to spawn map: ~w~n", [Reason]),
+	    ignore
+    end.
 
 register(Id) ->
     gproc:reg({n, l, {map, Id}}, ignored).

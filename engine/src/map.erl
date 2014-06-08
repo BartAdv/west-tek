@@ -98,14 +98,12 @@ start(Id, ProtoName) ->
 start_link() ->
     gen_server:start_link(?MODULE, null, []).
 
-start_link(Id, ProtoName) ->
-    gen_server:start_link(?MODULE, {Id, ProtoName}, []).
+start_link(Id, ProtoMap) ->
+    gen_server:start_link(?MODULE, {Id, ProtoMap}, []).
 
 init(null) ->
     {ok, #map_data{}};
-init({Id, ProtoName}) ->
-    ProtoMap = protomap_mgr:get(ProtoName),
-
+init({Id, ProtoMap}) ->
     Init = fn:comp(fn:partial(fun map_spawn_scenery/2, ProtoMap)
 		  ,fn:partial(fun map_spawn_entities/3, ProtoMap, Id)),
     Map  = Init(#map_data{proto = ProtoMap}),
@@ -136,7 +134,8 @@ handle_call(get_info, _From, #map_data{entities=Es}=Map) ->
 
 handle_info({'DOWN', _Ref, process, ProtoMap, _Reason}
 	   ,#map_data{proto=ProtoMap}=Map) ->
-    {stop, proto, Map#map_data{proto=nil}};
+    io:format("Proto ~w died~n", [ProtoMap]),
+    {stop, normal, Map#map_data{proto=nil}};
 
 %% when Entity process dies, we need to remove our references to it
 handle_info({'DOWN', Ref, process, Pid, _Reason}

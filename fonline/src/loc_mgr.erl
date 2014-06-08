@@ -1,11 +1,25 @@
--module(locations).
+-module(loc_mgr).
+-behaviour(gen_server).
 
 -export([init/1]).
 
+
+start_link(Path) ->
+    gen_server:start_link({local, loc_mgr}, ?MODULE, Path, []).
+
 init(Path) ->
     {ok, File} = file:open(filename:join(Path, "maps/Locations.cfg"), read),
-    load(File, #{}).
-   
+    Locs = load(File, #{}),
+    ToSpawn = lists:flatmap(fun({_, #{maps := Maps}}) -> 
+				    lists:map(fun({_, #{name := ProtoName}}) ->
+						      ProtoName
+					      end, maps:to_list(Maps))
+			    end, maps:to_list(Locs)),
+    lists:foldl(fun(ProtoName, Idx) ->
+			{ok, _} = map_mgr:add(Idx, filename:join([Path, "maps", ProtoName ++ ".fomap"])),
+			Idx+1
+		end, 1, ToSpawn).
+
 load(File, Locs) -> 
     case file:read_line(File) of
 	{ok, Line} ->
