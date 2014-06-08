@@ -59,8 +59,8 @@ handle_event({entity_entered_map, Self, Coords, Map},
 handle_event({entity_entered_map, Ent, Coords, Map},
              #vis_data{entity=Self, pos=Pos, vis_list=VisList, range=Range}=Vis) ->
     case gb_trees:lookup(Ent, VisList) of
-	{value, From} ->
-	    entity:notify(Self, {entity_moved_on_map, Ent, From, Coords, Map}),
+	{value, _From} ->
+	    entity:notify(Self, {entity_moved_on_map, Ent, Coords, Map}),
 	    {ok, Vis};
 	none ->
 	    case dist(Pos, Coords) =< Range of
@@ -90,7 +90,7 @@ handle_event({entity_left_map, Ent, _Map},
     end;
 
 %% self moves on map - recreate
-handle_event({entity_moved_on_map, Self, _From, To, Map},
+handle_event({entity_moved_on_map, Self, To, Map},
 	     #vis_data{entity=Self}=Vis) ->
     
     Vis2 = clear(Vis),
@@ -98,10 +98,10 @@ handle_event({entity_moved_on_map, Self, _From, To, Map},
     {ok, Vis2#vis_data{pos=To}};
 
 %% some other entity moves on map
-handle_event({entity_moved_on_map, Ent, From, To, _Map},
+handle_event({entity_moved_on_map, Ent, To, _Map},
              #vis_data{entity=Self, vis_list=VisList, pos=Pos, range=Range}=Vis) ->
     case gb_trees:lookup(Ent, VisList) of
-        {value, _} ->
+        {value, From} ->
             case dist(Pos, To) =< Range of
                 true ->
                     {ok, move_entity(Vis, From, To, Ent)};
@@ -192,14 +192,14 @@ leaving_range_test() ->
 moving_in_range_test() ->
     {Pid, E} = test_init({1,1}, 10),
     entity:sync_notify(Pid, {entity_entered_map, E, {2, 2}, nil}),
-    entity:sync_notify(Pid, {entity_moved_on_map, E, {2, 2}, {3, 3}, nil}),
+    entity:sync_notify(Pid, {entity_moved_on_map, E, {3, 3}, nil}),
     [] = get(Pid, {1, 1}),
     [E|_] = get(Pid, {3, 3}).
 
 moving_into_the_range_test() ->
     {Pid, E} = test_init({1, 1}, 2),
     entity:sync_notify(Pid, {entity_entered_map, E, {5, 5}, nil}),
-    entity:sync_notify(Pid, {entity_moved_on_map, E, {5, 5}, {2, 2}, nil}),
+    entity:sync_notify(Pid, {entity_moved_on_map, E, {2, 2}, nil}),
     [] = get(Pid, {4, 4}),
     [E|_] = get(Pid, {2, 2}).
 
@@ -271,7 +271,7 @@ multiple_enter_map_test() ->
     [{entity_entered_map, E, {2,2},_}
     ,{entity_spotted, E}
     ,{entity_entered_map, E, {2,3},_}
-    ,{entity_moved_on_map, E, {2,2}, {2,3}, _}] = entity:call(Self, test_handler, dump).
+    ,{entity_moved_on_map, E, {2,3}, _}] = entity:call(Self, test_handler, dump).
 
 self_enter_map_clears_vis_test() ->
     {Self, E} = test_init({1,1},2),

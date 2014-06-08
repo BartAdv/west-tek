@@ -1,6 +1,6 @@
 -module(act).
 
--export([enter_map/3, exit_map/2]).
+-export([enter_map/3, exit_map/2, move_on_map/3]).
  
 -define(TEST, 1).
  
@@ -17,6 +17,9 @@ exit_map(Entity, Map) ->
     map:remove_entity(Map, Entity),
     entity:notify(Entity, {entity_left_map, Entity, Map}),
     map:notify(Map, {entity_left_map, Entity, Map}).
+
+move_on_map(Entity, Map, To) ->
+    map:notify(Map, {entity_moved_on_map, Entity, To, Map}).
 
 -ifdef(TEST).
 
