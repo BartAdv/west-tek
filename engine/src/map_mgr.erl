@@ -1,4 +1,5 @@
 -module(map_mgr).
+-compile([{parse_transform, lager_transform}]).
 -behaviour(supervisor).
 
 -export([start/0, start_link/0, add/2, register/1, get/1, remove/1]).
@@ -15,10 +16,10 @@ add(Id, ProtoId) ->
 start_map(Id, ProtoId) ->
     case protomap_mgr:get(ProtoId) of
 	{ok, ProtoMap} -> 
-	    io:format("Spawning map {~w, \"~s\"}~n", [Id, ProtoId]),
+	    lager:info("Spawning map ~p", [{Id, ProtoId}]),
 	    map:start_link(Id, ProtoMap);
 	{error, Reason} -> 
-	    io:format("Unable to spawn map: ~w~n", [Reason]),
+	    lager:error("Unable to spawn map: ~p", [Reason]),
 	    ignore
     end.
 
